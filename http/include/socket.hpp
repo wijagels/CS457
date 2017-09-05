@@ -13,7 +13,6 @@
 extern "C" {
 #include <netdb.h>
 }
-#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -26,7 +25,11 @@ struct socket_exception : std::runtime_error {
 };
 
 struct addrinfo_del {
-  auto operator()(addrinfo *ptr) { freeaddrinfo(ptr); }
+  auto operator()(addrinfo *ptr) {
+    if (ptr) {
+      freeaddrinfo(ptr);
+    }
+  }
 };
 
 /*
@@ -58,38 +61,97 @@ std::unique_ptr<addrinfo, addrinfo_del> get_addr_info(const std::string &name,
 std::pair<std::vector<std::string>, std::vector<std::string>> addr_vec_from_addrinfo(
     const addrinfo &info);
 
+std::string str_to_error(int error);
+
 class Socket {
  public:
-  Socket(int type = SOCK_STREAM, int protocol = 0);
+  Socket() = default;
   ~Socket();
+  constexpr explicit Socket(int sock) noexcept : d_socket{sock} {}
   Socket(const Socket &) = delete;
   Socket(Socket &&) = default;
   Socket &operator=(const Socket &) = delete;
   Socket &operator=(Socket &&) = default;
 
   /*
-   * Fetches address of hostname and sets the socket to listen on that address on the supplied port
-   */
-  void bind_address(const std::string &hostname, uint16_t port);
-
-  /*
-   * Binds socket to listen on any interface at the specified port
-   */
-  void bind_all(uint16_t port);
-
-  /*
    * Wrapper around bind(2)
    */
-  void bind(sockaddr *addr_ptr, socklen_t len);
+  Socket &bind(const sockaddr *addr_ptr, socklen_t len);
 
+  /*
+   * Convenience function equivalent to bind(info.ai_addr, info.ai_addrlen)
+   */
+  Socket &bind(const addrinfo &info);
+
+ protected:
+  int d_socket = 0;
+};
+
+struct StreamSocket : Socket {
+  constexpr explicit StreamSocket(int sock) noexcept : Socket{sock} {}
+
+  StreamSocket(const std::string &address, uint16_t port);
+
+  /*
+   * Wrapper around connect()
+   * http://beej.us/guide/bgnet/output/html/multipage/syscalls.html#connect
+   */
+  StreamSocket &connect(const sockaddr *addr_ptr, socklen_t len);
+
+  /*
+   * Convenience function equivalent to send(info.ai_addr, info.ai_addrlen)
+   */
+  StreamSocket &connect(const addrinfo &info);
+
+  /*
+   * Send string over socket.
+   * Requires connection to be first established.
+   */
+  StreamSocket &send(const std::string &data, int flags = 0);
+
+  /*
+   * Fetches a string from the socket.
+   * Uses a thread-local buffer to avoid exploding the stack or making needless heap allocations
+   */
+  std::string recv(int flags = 0);
+
+  /*
+   * Wrapper around getpeername()
+   * http://beej.us/guide/bgnet/output/html/multipage/getpeernameman.html
+   */
+  sockaddr_storage get_peer_name();
+};
+
+struct DatagramSocket : Socket {
+  DatagramSocket &send_to(const std::string &data, const sockaddr &dest, socklen_t dest_len,
+                          int flags = 0);
+  std::string recv_from(const std::string &data, const sockaddr &dest, socklen_t dest_len,
+                        int flags = 0);
+};
+
+struct ServerSocket : Socket {
   /*
    * Wraps listen(2).
    */
-  void listen(int backlog);
+  ServerSocket &listen(int backlog);
+};
 
- protected:
-  int d_descriptor4;
-  int d_descriptor6;
+struct StreamServerSocket : ServerSocket {
+  /*
+   * Listen on any interface
+   */
+  StreamServerSocket(uint16_t port);
+
+  /*
+   * Listen on a specific address
+   */
+  StreamServerSocket(const std::string &address, uint16_t port);
+
+  /*
+   * Accept a connection and return a StreamSocket
+   * http://beej.us/guide/bgnet/output/html/multipage/syscalls.html#accept
+   */
+  StreamSocket accept();
 };
 
 #endif

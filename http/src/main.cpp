@@ -1,9 +1,10 @@
 #include "socket.hpp"
+#include <iostream>
 
-static constexpr uint16_t portnum = 8081;
+static constexpr uint16_t g_portnum = 8081;
 
 int main() {
-  Socket socket;
-  socket.bind_address("localhost", portnum);
-  socket.listen(100);
+  StreamServerSocket socket{g_portnum};
+  socket.listen(10);
+  std::cout << socket.accept().recv() << std::endl;
 }

@@ -13,67 +13,49 @@ extern "C" {
 #include <utility>
 #include <vector>
 
-Socket::Socket(int type, int protocol) {
-  d_descriptor4 = socket(AF_INET, type, protocol);
-  d_descriptor6 = socket(AF_INET6, type, protocol);
+std::string str_to_error(int error) {
+  thread_local static char buf[1024];
+#if (_POSIX_C_SOURCE >= 200112L) && !_GNU_SOURCE
+  auto rc = ::strerror_r(error, buf, 1024);
+  if (rc) throw std::runtime_error{"strerror_r failed to decode error"};
+  return buf;
+#else
+  return ::strerror_r(error, buf, sizeof(buf));
+#endif
 }
 
 Socket::~Socket() {
-  close(d_descriptor4);
-  close(d_descriptor6);
+  if (d_socket) close(d_socket);
 }
 
-void Socket::bind_address(const std::string &hostname, uint16_t port) {
-  auto info = get_addr_info(hostname, std::to_string(static_cast<int>(port)));
-  bind(info->ai_addr, info->ai_addrlen);
-}
-
-void Socket::bind_all(uint16_t port) {
-  addrinfo hints = {};
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;
-  auto info = get_addr_info("", std::to_string(static_cast<int>(port)), hints);
-  bind(info->ai_addr, info->ai_addrlen);
-}
-
-void Socket::bind(sockaddr *addr_ptr, socklen_t len) {
-  auto rc = ::bind(d_descriptor4, addr_ptr, len);
+Socket &Socket::bind(const sockaddr *addr_ptr, socklen_t len) {
+  auto rc = ::bind(d_socket, addr_ptr, len);
   if (rc < 0) throw socket_exception{"Failed to bind"};
+  return *this;
 }
 
-void Socket::listen(int backlog) {
-  auto r = ::listen(d_descriptor4, backlog);
+Socket &Socket::bind(const addrinfo &info) { return bind(info.ai_addr, info.ai_addrlen); }
+
+ServerSocket &ServerSocket::listen(int backlog) {
+  auto r = ::listen(d_socket, backlog);
   if (r) {
-    auto err = errno;  // Save in case make_unique calls malloc
-    // Allocate this on the heap so we don't bloat the stack in the event of success
-    auto buffer = std::make_unique<char[]>(1024);
-    strerror_r(err, buffer.get(), 1024);
-    throw socket_exception{buffer.get()};
+    throw socket_exception{str_to_error(errno)};
   }
-  r = ::listen(d_descriptor6, backlog);
-  if (r) {
-    auto err = errno;
-    auto buffer = std::make_unique<char[]>(1024);
-    strerror_r(err, buffer.get(), 1024);
-    throw socket_exception{buffer.get()};
-  }
+  return *this;
 }
 
 std::unique_ptr<addrinfo, addrinfo_del> get_addr_info(const std::string &name,
                                                       const std::string &service,
                                                       const addrinfo &hints) {
-  addrinfo result = {};
-  auto result_p = &result;
-
   const char *name_cs = nullptr;
   if (!name.empty()) name_cs = name.c_str();
   const char *service_cs = nullptr;
   if (!service.empty()) service_cs = service.c_str();
 
-  auto rcode = getaddrinfo(name_cs, service_cs, &hints, &result_p);
+  addrinfo *result_p;
+  auto rcode = ::getaddrinfo(name_cs, service_cs, &hints, &result_p);
+  if (rcode) throw socket_exception{::gai_strerror(rcode)};
   auto ptr = std::unique_ptr<addrinfo, addrinfo_del>(result_p);
-  if (rcode) throw socket_exception{gai_strerror(rcode)};
 
   return ptr;
 }
@@ -94,17 +76,17 @@ std::pair<std::vector<std::string>, std::vector<std::string>> addr_vec_from_addr
     switch (p->ai_family) {
       case AF_INET: {  // IPv4
         char ipstr[INET_ADDRSTRLEN];
-        sockaddr_in *ipv4 = reinterpret_cast<sockaddr_in *>(p->ai_addr);
+        auto *ipv4 = reinterpret_cast<sockaddr_in *>(p->ai_addr);
         addr = &(ipv4->sin_addr);
-        inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
+        ::inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
         v4.emplace_back(ipstr);
         break;
       }
       case AF_INET6: {  // IPv6
         char ipstr[INET6_ADDRSTRLEN];
-        sockaddr_in6 *ipv6 = reinterpret_cast<sockaddr_in6 *>(p->ai_addr);
+        auto *ipv6 = reinterpret_cast<sockaddr_in6 *>(p->ai_addr);
         addr = &(ipv6->sin6_addr);
-        inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
+        ::inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
         v6.emplace_back(ipstr);
         break;
       }
@@ -142,4 +124,97 @@ hostent get_host_by_name(const std::string &name) {
       }
     }
   }
+}
+
+StreamSocket::StreamSocket(const std::string &address, uint16_t port) {
+  addrinfo hints = {};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  auto info = get_addr_info(address, std::to_string(static_cast<int>(port)), hints);
+  Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+  connect(*info);
+}
+
+StreamSocket &StreamSocket::connect(const sockaddr *addr_ptr, socklen_t len) {
+  auto rc = ::connect(Socket::d_socket, addr_ptr, len);
+  if (rc < 0) {
+    throw socket_exception{str_to_error(errno)};
+  }
+  return *this;
+}
+
+StreamSocket &StreamSocket::connect(const addrinfo &info) {
+  return connect(info.ai_addr, info.ai_addrlen);
+}
+
+StreamSocket &StreamSocket::send(const std::string &data, int flags) {
+  auto to_send = data.size();
+  while (to_send) {
+    auto offset = data.size() - to_send;
+    const char *data_p = data.data() + offset;
+    auto sent = ::send(Socket::d_socket, data_p, to_send, flags);
+    if (sent < 0) {
+      throw socket_exception{str_to_error(errno)};
+    }
+    if (static_cast<size_t>(sent) > to_send) throw socket_exception{"Sent more than requested!"};
+    // sent will always be positive, making this cast safe
+    to_send -= static_cast<size_t>(sent);
+  }
+  return *this;
+}
+
+std::string StreamSocket::recv(int flags) {
+  thread_local static char raw_buf[64 * 1024];  // 64 KiB
+  constexpr auto raw_buf_sz = sizeof(raw_buf) / sizeof(raw_buf[0]);
+
+  auto received = ::recv(Socket::d_socket, raw_buf, raw_buf_sz, flags);
+  if (received < 0) {
+    throw socket_exception{str_to_error(errno)};
+  }
+
+  return {raw_buf, static_cast<size_t>(received)};
+}
+
+sockaddr_storage StreamSocket::get_peer_name() {
+  struct sockaddr_storage addr = {};
+  auto len = static_cast<socklen_t>(sizeof(addr));
+
+  auto rc = ::getpeername(Socket::d_socket, reinterpret_cast<sockaddr *>(&addr), &len);
+
+  if (rc) {
+    throw socket_exception{str_to_error(errno)};
+  }
+
+  return addr;
+}
+
+StreamServerSocket::StreamServerSocket(uint16_t port) {
+  addrinfo hints = {};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+  auto info = get_addr_info("", std::to_string(static_cast<int>(port)), hints);
+  Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+  Socket::bind(info->ai_addr, info->ai_addrlen);
+}
+
+StreamServerSocket::StreamServerSocket(const std::string &address, uint16_t port) {
+  addrinfo hints = {};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  auto info = get_addr_info(address, std::to_string(static_cast<int>(port)), hints);
+  Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+  Socket::bind(*info);
+}
+
+StreamSocket StreamServerSocket::accept() {
+  sockaddr_storage their_addr = {};
+  socklen_t addr_size = sizeof(their_addr);
+  auto socket_descriptor =
+      ::accept(Socket::d_socket, reinterpret_cast<sockaddr *>(&their_addr), &addr_size);
+  if (socket_descriptor < 0) {
+    throw socket_exception{str_to_error(errno)};
+  }
+
+  return StreamSocket{socket_descriptor};
 }

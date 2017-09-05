@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(${PROJECT_NAME_STR} src/socket.cpp)
+add_library(${PROJECT_NAME_STR} src/socket.cpp src/http.cpp)
 add_executable(${PROJECT_TEST_NAME} test/test.cpp)
 add_executable(server src/main.cpp)
 
