@@ -1,7 +1,7 @@
 #include "http.hpp"
+#include <sstream>
 #include <string>
 #include <unordered_map>
-#include <sstream>
 
 HttpParser::HttpParser(const std::string &data) {
   std::istringstream stream{data};
