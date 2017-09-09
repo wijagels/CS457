@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "socket.hpp"
+#include <fstream>
 
 extern "C" {
 #include <arpa/inet.h>

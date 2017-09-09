@@ -1,15 +1,27 @@
 cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
+
+include("HunterGate.cmake")
+HunterGate(
+    URL "https://github.com/ruslo/hunter/archive/v0.19.96.tar.gz"
+    SHA1 "8316d0491ee03a918d2e0973aaf5878d9bcfe472"
+)
+
 set(PROJECT_NAME_STR http)
 set(PROJECT_TEST_NAME ${PROJECT_NAME_STR}_test)
 project(${PROJECT_NAME_STR} VERSION 0.1 LANGUAGES CXX)
+
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(${PROJECT_NAME_STR} src/socket.cpp src/http.cpp)
+hunter_add_package(Boost COMPONENTS system filesystem)
+find_package(Boost REQUIRED COMPONENTS system filesystem)
+
+
+add_library(${PROJECT_NAME_STR} src/socket.cpp src/http.cpp src/mimedb.cpp)
 add_executable(${PROJECT_TEST_NAME} test/test.cpp)
-add_executable(server src/main.cpp)
+add_executable(server src/main.cpp src/server.cpp)
 
 target_compile_features(${PROJECT_NAME_STR} PRIVATE cxx_constexpr cxx_variadic_templates)
 
@@ -31,9 +43,11 @@ endif()
 target_include_directories(${PROJECT_NAME_STR} PUBLIC include)
 target_include_directories(server PUBLIC include)
 
-target_link_libraries(server PRIVATE ${PROJECT_NAME_STR} Threads::Threads)
+target_link_libraries(${PROJECT_NAME_STR} PRIVATE Boost::system Boost::filesystem)
+target_link_libraries(server PRIVATE ${PROJECT_NAME_STR} Boost::system Boost::filesystem Threads::Threads)
 
 enable_testing()
+hunter_add_package(GTest)
 find_package(GTest REQUIRED)
 target_link_libraries(${PROJECT_TEST_NAME} PRIVATE GTest::GTest GTest::Main ${PROJECT_NAME_STR})
 target_include_directories(${PROJECT_TEST_NAME} PUBLIC include ${GTEST_INCLUDE_DIRS})

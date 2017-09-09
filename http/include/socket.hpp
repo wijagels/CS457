@@ -13,6 +13,7 @@
 extern "C" {
 #include <netdb.h>
 }
+#include <istream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -69,9 +70,11 @@ class Socket {
   ~Socket();
   constexpr explicit Socket(int sock) noexcept : d_socket{sock} {}
   Socket(const Socket &) = delete;
-  Socket(Socket &&) = default;
+  Socket(Socket &&);
   Socket &operator=(const Socket &) = delete;
-  Socket &operator=(Socket &&) = default;
+  Socket &operator=(Socket &&);
+
+  void close();
 
   /*
    * Wrapper around bind(2)
@@ -84,12 +87,18 @@ class Socket {
   Socket &bind(const addrinfo &info);
 
  protected:
-  int d_socket = 0;
+  int d_socket = -1;
 };
 
 struct StreamSocket : Socket {
+  /*
+   * Take ownership over a socket file descriptor
+   */
   constexpr explicit StreamSocket(int sock) noexcept : Socket{sock} {}
 
+  /*
+   * Initialize socket, connect to the given address and port
+   */
   StreamSocket(const std::string &address, uint16_t port);
 
   /*
@@ -104,10 +113,20 @@ struct StreamSocket : Socket {
   StreamSocket &connect(const addrinfo &info);
 
   /*
+   * Send buffer of size sz over socket.
+   */
+  StreamSocket &send(const char *buffer_p, size_t sz, int flags = 0);
+
+  /*
    * Send string over socket.
    * Requires connection to be first established.
    */
   StreamSocket &send(const std::string &data, int flags = 0);
+
+  /*
+   * Send data from an input stream until exhausted
+   */
+  StreamSocket &send(std::istream &input, int flags = 0);
 
   /*
    * Fetches a string from the socket.
@@ -146,6 +165,11 @@ struct StreamServerSocket : ServerSocket {
    * Listen on a specific address
    */
   StreamServerSocket(const std::string &address, uint16_t port);
+
+  /*
+   * Promote a server socket to a stream server socket.
+   */
+  StreamServerSocket(ServerSocket &&sock);
 
   /*
    * Accept a connection and return a StreamSocket

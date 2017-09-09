@@ -9,6 +9,7 @@ extern "C" {
 }
 #include <cstdio>
 #include <cstring>
+#include <istream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -24,8 +25,23 @@ std::string str_to_error(int error) {
 #endif
 }
 
-Socket::~Socket() {
-  if (d_socket) close(d_socket);
+Socket::Socket(Socket &&other) : d_socket{other.d_socket} { other.d_socket = 0; }
+
+Socket &Socket::operator=(Socket &&other) {
+  if (this != &other) {
+    close();
+    d_socket = other.d_socket;
+    other.d_socket = -1;
+  }
+  return *this;
+}
+
+Socket::~Socket() { close(); }
+
+void Socket::close() {
+  if (d_socket > 0) {
+    ::close(d_socket);
+  }
 }
 
 Socket &Socket::bind(const sockaddr *addr_ptr, socklen_t len) {
@@ -147,19 +163,37 @@ StreamSocket &StreamSocket::connect(const addrinfo &info) {
   return connect(info.ai_addr, info.ai_addrlen);
 }
 
-StreamSocket &StreamSocket::send(const std::string &data, int flags) {
-  auto to_send = data.size();
+StreamSocket &StreamSocket::send(const char *buffer_p, size_t sz, int flags) {
+  auto to_send = sz;
   while (to_send) {
-    auto offset = data.size() - to_send;
-    const char *data_p = data.data() + offset;
-    auto sent = ::send(Socket::d_socket, data_p, to_send, flags);
+    auto sent = ::send(Socket::d_socket, buffer_p, to_send, flags);
     if (sent < 0) {
       throw socket_exception{str_to_error(errno)};
     }
-    if (static_cast<size_t>(sent) > to_send) throw socket_exception{"Sent more than requested!"};
-    // sent will always be positive, making this cast safe
+    if (static_cast<size_t>(sent) > to_send) {
+      throw socket_exception{"Sent more than requested!"};
+    }
     to_send -= static_cast<size_t>(sent);
+    buffer_p += sent;
   }
+  return *this;
+}
+
+StreamSocket &StreamSocket::send(const std::string &data, int flags) {
+  return send(data.data(), data.size(), flags);
+}
+
+StreamSocket &StreamSocket::send(std::istream &input, int flags) {
+  static char buf[8 * 1024];
+  while (input) {
+    input.read(buf, sizeof(buf));
+    if (input.gcount() > 0 && input.good() && static_cast<size_t>(input.gcount()) <= sizeof(buf)) {
+      send(buf, static_cast<size_t>(input.gcount()), flags);
+    } else if (input.eof()) {
+      return *this;
+    }
+  }
+  if (input.fail()) throw socket_exception{"Failure reading from istream"};
   return *this;
 }
 
@@ -206,6 +240,8 @@ StreamServerSocket::StreamServerSocket(const std::string &address, uint16_t port
   Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
   Socket::bind(*info);
 }
+
+StreamServerSocket::StreamServerSocket(ServerSocket &&sock) : ServerSocket{std::move(sock)} {}
 
 StreamSocket StreamServerSocket::accept() {
   sockaddr_storage their_addr = {};
