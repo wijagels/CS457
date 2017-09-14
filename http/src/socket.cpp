@@ -2,10 +2,10 @@
 
 extern "C" {
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <errno.h>
 }
 #include <cstring>
 #include <fstream>
@@ -163,14 +163,18 @@ StreamSocket &StreamSocket::connect(const addrinfo &info) {
 }
 
 StreamSocket &StreamSocket::send(const char *buffer_p, size_t sz, int flags) {
+  // Don't send a signal in the event of hangup, it's already handled
+  flags |= MSG_NOSIGNAL;
+
   auto to_send = sz;
   while (to_send) {
     auto sent = ::send(Socket::d_socket, buffer_p, to_send, flags);
     if (sent < 0) {
       throw socket_exception{str_to_error(errno)};
-    }
-    if (static_cast<size_t>(sent) > to_send) {
+    } else if (static_cast<size_t>(sent) > to_send) {
       throw socket_exception{"Sent more than requested!"};
+    } else if (!sent) {
+      throw socket_exception{"Nothing was sent!"};
     }
     to_send -= static_cast<size_t>(sent);
     buffer_p += sent;
@@ -183,7 +187,7 @@ StreamSocket &StreamSocket::send(const std::string &data, int flags) {
 }
 
 StreamSocket &StreamSocket::send(std::ifstream &input, int flags) {
-  static thread_local char buf[8 * 1024];
+  char buf[8 * 1024];
   while (input) {
     input.read(buf, sizeof(buf));
     if (input.gcount() > 0 && input.good() && static_cast<size_t>(input.gcount()) <= sizeof(buf)) {
@@ -198,7 +202,7 @@ StreamSocket &StreamSocket::send(std::ifstream &input, int flags) {
 }
 
 std::string StreamSocket::recv(int flags) {
-  thread_local static char raw_buf[64 * 1024];  // 64 KiB
+  char raw_buf[32 * 1024];  // 32 KiB
   constexpr auto raw_buf_sz = sizeof(raw_buf) / sizeof(raw_buf[0]);
 
   auto received = ::recv(Socket::d_socket, raw_buf, raw_buf_sz, flags);

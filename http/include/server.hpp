@@ -15,7 +15,7 @@ class HttpServer {
   HttpServer(uint16_t port);
   HttpServer(const std::string &address, uint16_t port);
 
-  void listen(int backlog = 10);
+  void listen(int backlog = 1000);
 
   void accept_connections();
 

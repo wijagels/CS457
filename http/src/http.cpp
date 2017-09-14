@@ -4,7 +4,6 @@
 #include <ctime>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -64,7 +63,6 @@ void HttpParser::parse_headers(const std::string &data) {
   std::string line;
   std::getline(stream, line);
   d_request_line = line;
-  std::cout << d_request_line << std::endl;
   while (std::getline(stream, line) && line != "\r") {
     auto pos = line.find(':');
     std::string title{line, 0, pos};
