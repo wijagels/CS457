@@ -12,8 +12,12 @@
 
 extern "C" {
 #include <netdb.h>
+#include <netinet/in.h>
+#include <stddef.h>
+#include <sys/socket.h>
 }
-#include <istream>
+
+#include <fstream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -31,6 +35,11 @@ struct addrinfo_del {
       freeaddrinfo(ptr);
     }
   }
+};
+
+struct PeerInfo {
+  in_port_t port;
+  std::string address;
 };
 
 /*
@@ -99,7 +108,7 @@ struct StreamSocket : Socket {
   /*
    * Initialize socket, connect to the given address and port
    */
-  StreamSocket(const std::string &address, uint16_t port);
+  StreamSocket(const std::string &address, in_port_t port);
 
   /*
    * Wrapper around connect()
@@ -108,7 +117,7 @@ struct StreamSocket : Socket {
   StreamSocket &connect(const sockaddr *addr_ptr, socklen_t len);
 
   /*
-   * Convenience function equivalent to send(info.ai_addr, info.ai_addrlen)
+   * Convenience function equivalent to connect(info.ai_addr, info.ai_addrlen)
    */
   StreamSocket &connect(const addrinfo &info);
 
@@ -126,7 +135,7 @@ struct StreamSocket : Socket {
   /*
    * Send data from an input stream until exhausted
    */
-  StreamSocket &send(std::istream &input, int flags = 0);
+  StreamSocket &send(std::ifstream &input, int flags = 0);
 
   /*
    * Fetches a string from the socket.
@@ -139,6 +148,11 @@ struct StreamSocket : Socket {
    * http://beej.us/guide/bgnet/output/html/multipage/getpeernameman.html
    */
   sockaddr_storage get_peer_name();
+
+  /*
+   * Higher level wrapper around getpeername, decodes the port and IP into strings.
+   */
+  PeerInfo get_peer_info();
 };
 
 struct DatagramSocket : Socket {
@@ -159,12 +173,12 @@ struct StreamServerSocket : ServerSocket {
   /*
    * Listen on any interface
    */
-  StreamServerSocket(uint16_t port);
+  StreamServerSocket(in_port_t port);
 
   /*
    * Listen on a specific address
    */
-  StreamServerSocket(const std::string &address, uint16_t port);
+  StreamServerSocket(const std::string &address, in_port_t port);
 
   /*
    * Promote a server socket to a stream server socket.

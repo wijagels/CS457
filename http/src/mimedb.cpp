@@ -11,7 +11,8 @@
 #include <unordered_set>
 #include <utility>
 
-MimeDb::MimeDb(const std::string &path) {
+MimeDb::MimeDb(const std::string &path, std::string default_type)
+    : d_default{std::move(default_type)} {
   std::ifstream file{path};
   std::string line;
   const boost::char_separator<char> sep{" \t"};
@@ -27,10 +28,10 @@ MimeDb::MimeDb(const std::string &path) {
   }
 }
 
-boost::optional<std::string> MimeDb::mime_of_ext(const std::string &extension) {
+std::string MimeDb::mime_of_ext(const std::string &extension) {
   auto it = d_ext_to_type.find(extension);
   if (it == d_ext_to_type.end()) {
-    return boost::none;
+    return d_default;
   }
   return it->second;
 }

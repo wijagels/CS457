@@ -1,12 +1,14 @@
 #ifndef SERVER_HPP_
 #define SERVER_HPP_
+#include "logger.hpp"
 #include "socket.hpp"
-#include <atomic>
+#include "http.hpp"
+#include "mimedb.hpp"
 #include <boost/filesystem/path.hpp>
 #include <cstdint>
-#include <mutex>
 #include <string>
-#include <unordered_map>
+#include <vector>
+#include <fstream>
 
 class HttpServer {
  public:
@@ -17,15 +19,14 @@ class HttpServer {
 
   void accept_connections();
 
-  void serve_get(const std::string &path);
  private:
   void conn_acceptor(StreamSocket &&conn);
-
+  HttpResponse serve_get(const HttpParser &parser, const PeerInfo &peer);
 
   StreamServerSocket d_socket;
   boost::filesystem::path d_base_path;
-  std::unordered_map<std::string, std::atomic_int_fast32_t> d_counts;
-  std::mutex d_write_lock;
+  Logger d_logger;
+  MimeDb d_mimedb;
 };
 
 #endif

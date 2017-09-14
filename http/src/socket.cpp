@@ -4,12 +4,11 @@ extern "C" {
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 }
-#include <cstdio>
 #include <cstring>
-#include <istream>
+#include <fstream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -142,7 +141,7 @@ hostent get_host_by_name(const std::string &name) {
   }
 }
 
-StreamSocket::StreamSocket(const std::string &address, uint16_t port) {
+StreamSocket::StreamSocket(const std::string &address, in_port_t port) {
   addrinfo hints = {};
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
@@ -183,17 +182,18 @@ StreamSocket &StreamSocket::send(const std::string &data, int flags) {
   return send(data.data(), data.size(), flags);
 }
 
-StreamSocket &StreamSocket::send(std::istream &input, int flags) {
-  static char buf[8 * 1024];
+StreamSocket &StreamSocket::send(std::ifstream &input, int flags) {
+  static thread_local char buf[8 * 1024];
   while (input) {
     input.read(buf, sizeof(buf));
     if (input.gcount() > 0 && input.good() && static_cast<size_t>(input.gcount()) <= sizeof(buf)) {
       send(buf, static_cast<size_t>(input.gcount()), flags);
     } else if (input.eof()) {
+      send(buf, static_cast<size_t>(input.gcount()), flags);
       return *this;
     }
   }
-  if (input.fail()) throw socket_exception{"Failure reading from istream"};
+  if (input.fail()) throw socket_exception{"Failure reading from ifstream"};
   return *this;
 }
 
@@ -222,7 +222,23 @@ sockaddr_storage StreamSocket::get_peer_name() {
   return addr;
 }
 
-StreamServerSocket::StreamServerSocket(uint16_t port) {
+PeerInfo StreamSocket::get_peer_info() {
+  auto addr = get_peer_name();
+  in_port_t port;
+  char ipstr[INET6_ADDRSTRLEN] = {0};
+  if (addr.ss_family == AF_INET) {
+    auto s = reinterpret_cast<sockaddr_in *>(&addr);
+    port = ntohs(s->sin_port);
+    inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof(ipstr));
+  } else {  // AF_INET6
+    auto s = reinterpret_cast<sockaddr_in6 *>(&addr);
+    port = ntohs(s->sin6_port);
+    inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof(ipstr));
+  }
+  return {port, std::string{ipstr}};
+}
+
+StreamServerSocket::StreamServerSocket(in_port_t port) {
   addrinfo hints = {};
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
@@ -232,7 +248,7 @@ StreamServerSocket::StreamServerSocket(uint16_t port) {
   Socket::bind(info->ai_addr, info->ai_addrlen);
 }
 
-StreamServerSocket::StreamServerSocket(const std::string &address, uint16_t port) {
+StreamServerSocket::StreamServerSocket(const std::string &address, in_port_t port) {
   addrinfo hints = {};
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;

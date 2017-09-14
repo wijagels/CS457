@@ -18,7 +18,6 @@ int main() {
   std::signal(SIGINT, sig_handler);  // Graceful ctrl-c shutdown
   try {
     HttpServer server{g_portnum};
-    server.serve_get("/../../../index.html");
     server.listen(10);
     server.accept_connections();
   } catch (int) {

@@ -15,11 +15,11 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-hunter_add_package(Boost COMPONENTS system filesystem)
+# hunter_add_package(Boost COMPONENTS system filesystem)
 find_package(Boost REQUIRED COMPONENTS system filesystem)
 
 
-add_library(${PROJECT_NAME_STR} src/socket.cpp src/http.cpp src/mimedb.cpp)
+add_library(${PROJECT_NAME_STR} src/socket.cpp src/http.cpp src/mimedb.cpp src/logger.cpp)
 add_executable(${PROJECT_TEST_NAME} test/test.cpp)
 add_executable(server src/main.cpp src/server.cpp)
 
@@ -47,7 +47,7 @@ target_link_libraries(${PROJECT_NAME_STR} PRIVATE Boost::system Boost::filesyste
 target_link_libraries(server PRIVATE ${PROJECT_NAME_STR} Boost::system Boost::filesystem Threads::Threads)
 
 enable_testing()
-hunter_add_package(GTest)
+# hunter_add_package(GTest)
 find_package(GTest REQUIRED)
 target_link_libraries(${PROJECT_TEST_NAME} PRIVATE GTest::GTest GTest::Main ${PROJECT_NAME_STR})
 target_include_directories(${PROJECT_TEST_NAME} PUBLIC include ${GTEST_INCLUDE_DIRS})
