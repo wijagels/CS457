@@ -23,10 +23,16 @@ extern "C" {
 #include <string>
 #include <utility>
 #include <vector>
+#include <regex>
 
 struct socket_exception : std::runtime_error {
   explicit socket_exception(const char *what_arg) : std::runtime_error{what_arg} {}
   explicit socket_exception(const std::string &what_arg) : std::runtime_error{what_arg} {}
+};
+
+struct socket_closed : std::runtime_error {
+  explicit socket_closed(const char *what_arg) : std::runtime_error{what_arg} {}
+  explicit socket_closed(const std::string &what_arg) : std::runtime_error{what_arg} {}
 };
 
 struct addrinfo_del {
@@ -142,6 +148,8 @@ struct StreamSocket : Socket {
    * Uses a thread-local buffer to avoid exploding the stack or making needless heap allocations
    */
   std::string recv(int flags = 0);
+
+  std::string recv_msg(const std::regex &delimiter, int flags = 0);
 
   /*
    * Wrapper around getpeername()

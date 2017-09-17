@@ -4,7 +4,7 @@ include("HunterGate.cmake")
 HunterGate(
     URL "https://github.com/ruslo/hunter/archive/v0.19.96.tar.gz"
     SHA1 "8316d0491ee03a918d2e0973aaf5878d9bcfe472"
-)
+    )
 
 set(PROJECT_NAME_STR http)
 set(PROJECT_TEST_NAME ${PROJECT_NAME_STR}_test)
@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# hunter_add_package(Boost COMPONENTS system filesystem)
+hunter_add_package(Boost COMPONENTS system filesystem)
 find_package(Boost REQUIRED COMPONENTS system filesystem)
 
 
@@ -28,15 +28,15 @@ target_compile_features(${PROJECT_NAME_STR} PRIVATE cxx_constexpr cxx_variadic_t
 if(CMAKE_COMPILER_IS_GNUCXX)
     target_compile_options(${PROJECT_NAME_STR}
         PUBLIC
-        -g -Wall -Wextra -Werror -pedantic -Winline -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror
+        -g -Wall -Wextra -Werror -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror
         )
     target_compile_options(${PROJECT_TEST_NAME}
         PUBLIC
-        -Wall -Wextra -Werror -pedantic -Winline -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror
+        -Wall -Wextra -Werror -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror
         )
     target_compile_options(server
         PUBLIC
-        -Wall -Wextra -Werror -pedantic -Winline -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror
+        -g -Wall -Wextra -Werror -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror
         )
 endif()
 
@@ -47,7 +47,7 @@ target_link_libraries(${PROJECT_NAME_STR} PRIVATE Boost::system Boost::filesyste
 target_link_libraries(server PRIVATE ${PROJECT_NAME_STR} Boost::system Boost::filesystem Threads::Threads)
 
 enable_testing()
-# hunter_add_package(GTest)
+hunter_add_package(GTest)
 find_package(GTest REQUIRED)
 target_link_libraries(${PROJECT_TEST_NAME} PRIVATE GTest::GTest GTest::Main ${PROJECT_NAME_STR})
 target_include_directories(${PROJECT_TEST_NAME} PUBLIC include ${GTEST_INCLUDE_DIRS})

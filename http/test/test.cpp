@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "socket.hpp"
+#include "mimedb.hpp"
 #include <fstream>
 
 extern "C" {
@@ -37,4 +38,9 @@ TEST(SocketTest, streamsockconn) {  // NOLINT
   StreamSocket g{"wtfismyip.com", 80};
   g.send(req);
   std::cout << g.recv() << std::endl;
+}
+
+TEST(MimeDbTest, html) {  // NOLINT
+  MimeDb mdb;
+  EXPECT_EQ(mdb.mime_of_ext("html"), "text/html");
 }

@@ -56,6 +56,13 @@ static const std::unordered_map<uint_fast16_t, const char *> g_status_reason_map
     {504, "Gateway Time-out"},
     {505, "HTTP Version not supported"}};
 
+static const std::unordered_map<std::string, HttpMethod> g_http_method_map{
+    {"GET", HttpMethod::GET},         {"HEAD", HttpMethod::HEAD},
+    {"POST", HttpMethod::POST},       {"PUT", HttpMethod::PUT},
+    {"DELETE", HttpMethod::DELETE},   {"CONNECT", HttpMethod::CONNECT},
+    {"OPTIONS", HttpMethod::OPTIONS}, {"TRACE", HttpMethod::TRACE},
+    {"PATCH", HttpMethod::PATCH}};
+
 HttpParser::HttpParser(const std::string &data) { parse_headers(data); }
 
 void HttpParser::parse_headers(const std::string &data) {

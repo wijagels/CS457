@@ -10,6 +10,8 @@ struct http_exception : std::runtime_error {
   explicit http_exception(const std::string &what_arg) : std::runtime_error{what_arg} {}
 };
 
+enum class HttpMethod { GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH };
+
 class HttpParser {
  public:
   HttpParser(const std::string &data);

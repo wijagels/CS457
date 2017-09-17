@@ -19,7 +19,7 @@ MimeDb::MimeDb(const std::string &path, std::string default_type)
   while (std::getline(file, line)) {
     boost::tokenizer<boost::char_separator<char>> tokens{line, sep};
     if (boost::algorithm::starts_with(line, "#")) continue;
-    if (tokens.begin() != tokens.end()) continue;
+    if (tokens.begin() == tokens.end()) continue;
     std::string mime_type = *tokens.begin();
     d_types.insert(mime_type);
     for (auto t = ++tokens.begin(); t != tokens.end(); ++t) {

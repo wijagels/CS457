@@ -39,6 +39,7 @@ Socket::~Socket() { close(); }
 
 void Socket::close() {
   if (d_socket > 0) {
+    ::shutdown(d_socket, 2);
     ::close(d_socket);
   }
 }
@@ -78,7 +79,7 @@ std::unique_ptr<addrinfo, addrinfo_del> get_addr_info(const std::string &name,
 std::unique_ptr<addrinfo, addrinfo_del> get_addr_info(const std::string &name,
                                                       const std::string &service) {
   addrinfo hints = {};
-  hints.ai_family = AF_INET;
+  hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   return get_addr_info(name, service, hints);
 }
@@ -187,7 +188,7 @@ StreamSocket &StreamSocket::send(const std::string &data, int flags) {
 }
 
 StreamSocket &StreamSocket::send(std::ifstream &input, int flags) {
-  char buf[8 * 1024];
+  char buf[4 * 1024];
   while (input) {
     input.read(buf, sizeof(buf));
     if (input.gcount() > 0 && input.good() && static_cast<size_t>(input.gcount()) <= sizeof(buf)) {
@@ -202,15 +203,27 @@ StreamSocket &StreamSocket::send(std::ifstream &input, int flags) {
 }
 
 std::string StreamSocket::recv(int flags) {
-  char raw_buf[32 * 1024];  // 32 KiB
-  constexpr auto raw_buf_sz = sizeof(raw_buf) / sizeof(raw_buf[0]);
+  char raw_buf[4 * 1024];  // 4 KiB
 
-  auto received = ::recv(Socket::d_socket, raw_buf, raw_buf_sz, flags);
-  if (received < 0) {
+  auto received = ::recv(Socket::d_socket, raw_buf, sizeof(raw_buf), flags);
+  if (received == 0) {
+    throw socket_closed{"Socket is closed"};
+  } else if (received < 0) {
     throw socket_exception{str_to_error(errno)};
   }
 
   return {raw_buf, static_cast<size_t>(received)};
+}
+
+std::string StreamSocket::recv_msg(const std::regex &delimiter, int flags) {
+  std::string ret;
+  std::string buf;
+  do {
+    buf = recv(flags);
+    ret.append(buf);
+  } while (!std::regex_search(buf, delimiter));
+
+  return ret;
 }
 
 sockaddr_storage StreamSocket::get_peer_name() {
@@ -244,20 +257,24 @@ PeerInfo StreamSocket::get_peer_info() {
 
 StreamServerSocket::StreamServerSocket(in_port_t port) {
   addrinfo hints = {};
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_INET6;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
   auto info = get_addr_info("", std::to_string(static_cast<int>(port)), hints);
   Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
-  Socket::bind(info->ai_addr, info->ai_addrlen);
+  constexpr bool optval = true;
+  ::setsockopt(Socket::d_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+  Socket::bind(*info);
 }
 
 StreamServerSocket::StreamServerSocket(const std::string &address, in_port_t port) {
   addrinfo hints = {};
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_INET6;
   hints.ai_socktype = SOCK_STREAM;
   auto info = get_addr_info(address, std::to_string(static_cast<int>(port)), hints);
   Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+  constexpr bool optval = true;
+  ::setsockopt(Socket::d_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
   Socket::bind(*info);
 }
 
