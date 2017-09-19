@@ -43,6 +43,7 @@ void HttpServer::accept_connections() {
 void HttpServer::send_response(HttpResponse &response, StreamSocket &conn) {
   response.d_response_headers.emplace_back("Date", http_time());
   response.d_response_headers.emplace_back("Connection", "keep-alive");
+  response.d_response_headers.emplace_back("Server", "trashttpd/1.0.0 (GNU+Linux)");
 
   conn.cork();  // Performance tweak, ensure the headers don't get sent if they don't fill a frame.
   conn.send(response.make_header());
