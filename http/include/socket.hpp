@@ -19,11 +19,11 @@ extern "C" {
 
 #include <fstream>
 #include <memory>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-#include <regex>
 
 struct socket_exception : std::runtime_error {
   explicit socket_exception(const char *what_arg) : std::runtime_error{what_arg} {}
@@ -101,15 +101,27 @@ class Socket {
    */
   Socket &bind(const addrinfo &info);
 
+  /**
+   * Sets option on socket, throws if invalid.
+   */
+  template <typename T>
+  void set_option(int level, int option_name, const T &option_value) {
+    int rc = ::setsockopt(d_socket, level, option_name, &option_value, sizeof(T));
+    if (rc) {  // Must return 0 on success
+      throw socket_exception{str_to_error(errno)};
+    }
+  }
+
  protected:
   int d_socket = -1;
 };
 
-struct StreamSocket : Socket {
+class StreamSocket : Socket {
+ public:
   /*
    * Take ownership over a socket file descriptor
    */
-  constexpr explicit StreamSocket(int sock) noexcept : Socket{sock} {}
+  explicit StreamSocket(int sock) noexcept : Socket{sock} {}
 
   /*
    * Initialize socket, connect to the given address and port
@@ -143,6 +155,11 @@ struct StreamSocket : Socket {
    */
   StreamSocket &send(std::ifstream &input, int flags = 0);
 
+  /**
+   * Sends file descriptor over socket using sendfile()
+   */
+  StreamSocket &send_file(int fd, size_t count);
+
   /*
    * Fetches a string from the socket.
    * Uses a thread-local buffer to avoid exploding the stack or making needless heap allocations
@@ -161,6 +178,18 @@ struct StreamSocket : Socket {
    * Higher level wrapper around getpeername, decodes the port and IP into strings.
    */
   PeerInfo get_peer_info();
+
+  /**
+   * Aliases to set/unset TCP_CORK
+   */
+  void cork();
+  void uncork();
+
+ private:
+  /**
+   * Buffer used for leftovers from recv_msg()
+   */
+  std::string d_unsent_buf;
 };
 
 struct DatagramSocket : Socket {

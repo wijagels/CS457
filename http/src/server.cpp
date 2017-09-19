@@ -1,8 +1,6 @@
 #include "server.hpp"
 #include "http.hpp"
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
 #include <cstdint>
 #include <fstream>
 #include <future>
@@ -10,13 +8,27 @@
 #include <regex>
 #include <system_error>
 #include <unordered_map>
+#include <unordered_map>
 
-static const std::regex g_http_msg_end{"(?:\r\n\r\n)|(?:\r\r)|(?:\n\n)"};
+#if __has_include(<filesystem>)
+#include <filesystem>
+namespace {
+namespace stdfs = stdfs;
+}
+#else
+#include <experimental/filesystem>
+namespace {
+namespace stdfs = std::experimental::filesystem;
+}
+#endif
 
-HttpServer::HttpServer(uint16_t port, boost::filesystem::path base_path)
+static const auto g_regex_flags = std::regex_constants::ECMAScript | std::regex_constants::optimize;
+static const std::regex g_http_msg_end{"(?:\r\n\r\n)|(?:\r\r)|(?:\n\n)", g_regex_flags};
+
+HttpServer::HttpServer(uint16_t port, stdfs::path base_path)
     : d_socket{port}, d_base_path{std::move(base_path)} {}
 
-HttpServer::HttpServer(const std::string &address, uint16_t port, boost::filesystem::path base_path)
+HttpServer::HttpServer(const std::string &address, uint16_t port, stdfs::path base_path)
     : d_socket{address, port}, d_base_path{std::move(base_path)} {}
 
 void HttpServer::listen(int backlog) { d_socket.listen(backlog); }
@@ -24,17 +36,22 @@ void HttpServer::listen(int backlog) { d_socket.listen(backlog); }
 void HttpServer::accept_connections() {
   auto acceptor = [this](StreamSocket &&conn) { conn_acceptor(std::move(conn)); };
   for (;;) {
-      std::thread(acceptor, d_socket.accept()).detach();
+    std::thread(acceptor, d_socket.accept()).detach();
   }
 }
 
 void HttpServer::send_response(HttpResponse &response, StreamSocket &conn) {
+  response.d_response_headers.emplace_back("Date", http_time());
+  response.d_response_headers.emplace_back("Connection", "keep-alive");
+
+  conn.cork();  // Performance tweak, ensure the headers don't get sent if they don't fill a frame.
   conn.send(response.make_header());
   if (response.d_status_code < 400) {
-    conn.send(response.d_body_stream);
+    conn.send_file(response.d_file.fd(), response.d_length);
   } else {
     conn.send(response.d_error_str);
   }
+  conn.uncork();
 }
 
 void HttpServer::conn_acceptor(StreamSocket &&conn) {
@@ -45,9 +62,6 @@ void HttpServer::conn_acceptor(StreamSocket &&conn) {
         HttpParser parser{s};
         auto resp = serve_get(parser, conn.get_peer_info());
         send_response(resp, conn);
-        // auto resp = HttpResponse{200, {{"Content-length", "102"}},
-        // std::ifstream{"www/test.html"}};
-        // send_response(resp, conn);
       } catch (const http_exception &e) {
         std::cerr << e.what() << std::endl;
         HttpResponse res{400, {}, {}};
@@ -73,13 +87,13 @@ void HttpServer::conn_acceptor(StreamSocket &&conn) {
 
 HttpResponse HttpServer::serve_get(const HttpParser &parser, const PeerInfo &peer) {
   auto path = parser.path();
-  auto p = boost::filesystem::path{path};
+  auto p = stdfs::path{path};
   if (!p.is_absolute()) {
-    return {400, {{"Connection", "keep-alive"}, {"Content-Length", "0"}}, {}};
+    return {400, {{"Content-Length", "0"}}, {}};
   }
   auto full_path = d_base_path / p;
-  if (!boost::filesystem::exists(full_path) || boost::filesystem::is_directory(full_path)) {
-    return {404, {{"Connection", "keep-alive"}, {"Content-Length", "0"}}, {}};
+  if (!stdfs::exists(full_path) || stdfs::is_directory(full_path)) {
+    return {404, {{"Content-Length", "0"}}, {}};
   }
 
   auto ext = full_path.extension().native();
@@ -89,15 +103,21 @@ HttpResponse HttpServer::serve_get(const HttpParser &parser, const PeerInfo &pee
   }
   d_logger.log_get(path, peer.address, peer.port);
 
-  std::ifstream file{full_path.native(), std::ios::ate};
-  // Determine size
-  auto length = file.tellg();
-  file.seekg(0);
+  auto file_size = stdfs::file_size(full_path);
+  auto last_modified = time_to_http(stdfs::last_write_time(full_path));
 
   std::vector<std::pair<std::string, std::string>> headers{
-      {"Connection", "keep-alive"},
       {"Content-Type", d_mimedb.mime_of_ext(ext)},
-      {"Content-Length", std::to_string(length)}};
+      {"Content-Length", std::to_string(file_size)},
+      {"Last-Modified", last_modified}};
 
-  return {200, headers, std::move(file)};
+  File file{full_path.native(), O_RDONLY};
+  if (file.fd() < 0) {
+    const std::string error_str = "Server overloaded";
+    auto ret = HttpResponse{503, {{"Content-Length", std::to_string(error_str.size())}}, {}};
+    ret.d_error_str = error_str;
+    return ret;
+  }
+
+  return {200, headers, std::move(file), file_size};
 }

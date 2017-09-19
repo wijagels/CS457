@@ -1,11 +1,10 @@
 #include "http.hpp"
-#include <boost/algorithm/string/trim.hpp>
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <iomanip>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <utility>
 
 static constexpr auto g_http_ver = "HTTP/1.1";
@@ -74,8 +73,6 @@ void HttpParser::parse_headers(const std::string &data) {
     auto pos = line.find(':');
     std::string title{line, 0, pos};
     std::string value{line, pos + 1};
-    boost::trim(title);
-    boost::trim(value);
     d_headers.emplace(std::move(title), std::move(value));
   }
 }
@@ -90,17 +87,18 @@ std::string HttpParser::path() const {
 
 HttpResponse::HttpResponse(uint_fast16_t status_code, std::string reason_phrase,
                            std::vector<std::pair<std::string, std::string>> response_headers,
-                           std::ifstream &&body_stream)
+                           File file, size_t length)
     : d_status_code{status_code},
       d_reason_phrase{std::move(reason_phrase)},
       d_response_headers{std::move(response_headers)},
-      d_body_stream{std::move(body_stream)} {}
+      d_file{std::move(file)},
+      d_length{length} {}
 
 HttpResponse::HttpResponse(uint_fast16_t status_code,
                            std::vector<std::pair<std::string, std::string>> response_headers,
-                           std::ifstream &&body_stream)
+                           File file, size_t length)
     : HttpResponse{status_code, g_status_reason_map.at(status_code), std::move(response_headers),
-                   std::move(body_stream)} {}
+                   std::move(file), length} {}
 
 std::string HttpResponse::make_header() {
   std::ostringstream os;
@@ -112,12 +110,4 @@ std::string HttpResponse::make_header() {
   return os.str();
 }
 
-std::string http_time() {
-  auto now = std::chrono::system_clock::now();
-  auto now_c = std::chrono::system_clock::to_time_t(now);
-  std::tm out;
-  gmtime_r(&now_c, &out);
-  std::ostringstream os;
-  os << std::put_time(&out, "%a, %d %b %Y %H:%M:%S %Z");
-  return os.str();
-}
+std::string http_time() { return time_to_http(std::chrono::system_clock::now()); }

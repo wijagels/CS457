@@ -1,6 +1,9 @@
 #ifndef HTTP_HPP_
 #define HTTP_HPP_
+#include "file.hpp"
+#include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -38,25 +41,42 @@ class HttpParser {
  */
 struct HttpResponse {
   HttpResponse(uint_fast16_t response_code, std::string reason_phrase,
-               std::vector<std::pair<std::string, std::string>> response_headers,
-               std::ifstream &&body_stream);
+               std::vector<std::pair<std::string, std::string>> response_headers, File file,
+               size_t length = 0);
 
   HttpResponse(uint_fast16_t response_code,
-               std::vector<std::pair<std::string, std::string>> response_headers,
-               std::ifstream &&body_stream);
+               std::vector<std::pair<std::string, std::string>> response_headers, File file,
+               size_t length = 0);
 
   std::string make_header();
 
   uint_fast16_t d_status_code;
   std::string d_reason_phrase;
   std::vector<std::pair<std::string, std::string>> d_response_headers;
-  std::ifstream d_body_stream;
+  File d_file;
+  size_t d_length;
   // Error string for status codes >= 400
   std::string d_error_str;
 };
 
 /*
- * Returns the current time in RFC 2616 section 3.3.1 format
+ * Returns the time formatted in RFC 2616 section 3.3.1 style
+ */
+template <typename Clock, typename Duration>
+std::string time_to_http(const std::chrono::time_point<Clock, Duration> &time) {
+  char buf[32];
+  auto time_c = std::chrono::system_clock::to_time_t(time);
+  std::tm out;
+  gmtime_r(&time_c, &out);
+  auto len = std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &out);
+  if (!len) {
+    throw std::runtime_error{"Strftime failed"};
+  }
+  return {buf, len};
+}
+
+/*
+ * Alias to call time_to_http with the current time
  */
 std::string http_time();
 

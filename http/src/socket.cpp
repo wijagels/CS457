@@ -4,6 +4,8 @@ extern "C" {
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <unistd.h>
 }
@@ -202,6 +204,21 @@ StreamSocket &StreamSocket::send(std::ifstream &input, int flags) {
   return *this;
 }
 
+StreamSocket &StreamSocket::send_file(int fd, size_t count) {
+  off_t offset = 0;
+  while (count) {
+    auto sent = ::sendfile(Socket::d_socket, fd, &offset, count);
+    if (sent < 0) {
+      throw socket_exception{"Sendfile failed: " + str_to_error(errno)};
+    }
+    if (static_cast<size_t>(sent) > count) {
+      throw socket_exception{"Sendfile sent more than requested"};
+    }
+    count -= static_cast<size_t>(sent);
+  }
+  return *this;
+}
+
 std::string StreamSocket::recv(int flags) {
   char raw_buf[4 * 1024];  // 4 KiB
 
@@ -216,12 +233,29 @@ std::string StreamSocket::recv(int flags) {
 }
 
 std::string StreamSocket::recv_msg(const std::regex &delimiter, int flags) {
-  std::string ret;
-  std::string buf;
-  do {
-    buf = recv(flags);
+  // if (std::regex_search(d_unsent_buf, results, delimiter)) {
+  //   auto end_idx = results.position() + results.length();
+  //   auto ret = d_unsent_buf.substr(0, end_idx);
+  //   d_unsent_buf = d_unsent_buf.substr(end_idx + 1, d_unsent_buf.size() - end_idx);
+  //   return ret;
+  // }
+
+  std::match_results<std::string::const_iterator> results;
+  std::string ret = d_unsent_buf;
+  std::string buf = d_unsent_buf;
+
+  while (!std::regex_search(buf, results, delimiter)) {
     ret.append(buf);
-  } while (!std::regex_search(buf, delimiter));
+    buf = recv(flags);
+  }
+
+  auto end_idx_l = results.position() + results.length();
+  if (end_idx_l < 0) {
+    throw socket_exception{"Ending index of regex search is negative"};
+  }
+  auto end_idx = static_cast<size_t>(end_idx_l);
+  ret.append(d_unsent_buf.substr(0, end_idx));
+  d_unsent_buf = d_unsent_buf.substr(end_idx + 1, d_unsent_buf.size() - end_idx);
 
   return ret;
 }
@@ -255,6 +289,9 @@ PeerInfo StreamSocket::get_peer_info() {
   return {port, std::string{ipstr}};
 }
 
+void StreamSocket::cork() { Socket::set_option(IPPROTO_TCP, TCP_CORK, 1); }
+void StreamSocket::uncork() { Socket::set_option(IPPROTO_TCP, TCP_CORK, 0); }
+
 StreamServerSocket::StreamServerSocket(in_port_t port) {
   addrinfo hints = {};
   hints.ai_family = AF_INET6;
@@ -262,8 +299,8 @@ StreamServerSocket::StreamServerSocket(in_port_t port) {
   hints.ai_flags = AI_PASSIVE;
   auto info = get_addr_info("", std::to_string(static_cast<int>(port)), hints);
   Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
-  constexpr bool optval = true;
-  ::setsockopt(Socket::d_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+  Socket::set_option(SOL_SOCKET, SO_REUSEADDR, 1);
+  Socket::set_option(IPPROTO_TCP, TCP_NODELAY, 1);
   Socket::bind(*info);
 }
 
@@ -273,8 +310,8 @@ StreamServerSocket::StreamServerSocket(const std::string &address, in_port_t por
   hints.ai_socktype = SOCK_STREAM;
   auto info = get_addr_info(address, std::to_string(static_cast<int>(port)), hints);
   Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
-  constexpr bool optval = true;
-  ::setsockopt(Socket::d_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+  Socket::set_option(SOL_SOCKET, SO_REUSEADDR, 1);
+  Socket::set_option(IPPROTO_TCP, TCP_NODELAY, 1);
   Socket::bind(*info);
 }
 
