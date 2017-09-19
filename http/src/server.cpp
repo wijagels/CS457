@@ -8,7 +8,6 @@
 #include <regex>
 #include <system_error>
 #include <unordered_map>
-#include <unordered_map>
 
 #if __has_include(<filesystem>)
 #include <filesystem>
@@ -26,10 +25,24 @@ static const auto g_regex_flags = std::regex_constants::ECMAScript | std::regex_
 static const std::regex g_http_msg_end{"(?:\r\n\r\n)|(?:\r\r)|(?:\n\n)", g_regex_flags};
 
 HttpServer::HttpServer(uint16_t port, stdfs::path base_path)
-    : d_socket{port}, d_base_path{std::move(base_path)} {}
+    : d_socket{port}, d_base_path{std::move(base_path)} {
+  if (!stdfs::is_directory(base_path)) {
+    std::cout << "Trashttpd started on the any address, port " << port << '\n';
+  } else {
+    std::cerr << "Nonexistent base path, exiting.\n";
+    exit(1);
+  }
+}
 
 HttpServer::HttpServer(const std::string &address, uint16_t port, stdfs::path base_path)
-    : d_socket{address, port}, d_base_path{std::move(base_path)} {}
+    : d_socket{address, port}, d_base_path{std::move(base_path)} {
+  if (!stdfs::is_directory(base_path)) {
+    std::cout << "Trashttpd started on " << address << ":" << port << '\n';
+  } else {
+    std::cerr << "Nonexistent base path, exiting.\n";
+    exit(1);
+  }
+}
 
 void HttpServer::listen(int backlog) { d_socket.listen(backlog); }
 

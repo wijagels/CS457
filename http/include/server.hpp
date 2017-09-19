@@ -26,9 +26,9 @@ namespace stdfs = std::experimental::filesystem;
 
 class HttpServer {
  public:
-  HttpServer(uint16_t port, stdfs::path base_path = stdfs::current_path() / stdfs::path{"www"});
+  HttpServer(uint16_t port, stdfs::path base_path = stdfs::current_path() / "www");
   HttpServer(const std::string &address, uint16_t port,
-             stdfs::path base_path = stdfs::current_path() / stdfs::path{"www"});
+             stdfs::path base_path = stdfs::current_path() / "www");
 
   /**
    * Begin listening on the socket.

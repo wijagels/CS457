@@ -294,7 +294,7 @@ void StreamSocket::uncork() { Socket::set_option(IPPROTO_TCP, TCP_CORK, 0); }
 
 StreamServerSocket::StreamServerSocket(in_port_t port) {
   addrinfo hints = {};
-  hints.ai_family = AF_INET6;
+  hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
   auto info = get_addr_info("", std::to_string(static_cast<int>(port)), hints);
@@ -306,7 +306,7 @@ StreamServerSocket::StreamServerSocket(in_port_t port) {
 
 StreamServerSocket::StreamServerSocket(const std::string &address, in_port_t port) {
   addrinfo hints = {};
-  hints.ai_family = AF_INET6;
+  hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   auto info = get_addr_info(address, std::to_string(static_cast<int>(port)), hints);
   Socket::d_socket = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
