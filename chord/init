@@ -268,7 +268,7 @@ hsd=dict([(hs[i],i) for i in xrange(len(hs))])
 def hs_add(h1,h2):
     if len(h1)>len(h2):
         swp=h1;h1=h2;h2=swp
-        
+
     df=len(h2)-len(h1)
     res=[]
     c=0
@@ -281,10 +281,10 @@ def hs_add(h1,h2):
         r=hsd[h2[i]]+c
         res.append(hs[r%16])
         c=r/16
-    
+
     if c>0:
         res.append(hs[c])
-        
+
     res.reverse()
     return ''.join(res)
 
@@ -292,14 +292,14 @@ def create_node(s):
     sha256=hashlib.sha256()
     sha256.update(s)
     k=sha256.hexdigest()
-    
+
     m=re.match('([^:]+):([^:]+)',s)
     return NodeID(k,m.group(1),int(m.group(2)))
 
 def bs(k,lst,b,e):
     if b+1==e:
         return e
-    
+
     m=(b+e)/2
     if k<=lst[m].id: return bs(k,lst,b,m)
     else: return bs(k,lst,m,e)
@@ -314,13 +314,13 @@ def create_fing(id,lst):
             fid=hs_add(id,add)[-64:]
 
             idx=bs(fid,lst,0,len(lst))
-            
-            if idx>=len(lst): 
+
+            if idx>=len(lst):
                 fing.append(lst[0])
-            else: 
+            else:
                 fing.append(lst[idx])
         add[63-i]='0'
-    
+
     return fing
 
 def init_server(nid,lst,cdct=None):
@@ -339,10 +339,10 @@ def init_server(nid,lst,cdct=None):
         client=cdct['%s:%d'%(nid.ip, nid.port)]
         client.setFingertable(fing)
 
-    
+
 if __name__=='__main__':
     fn=sys.argv[1]
     lst=sorted([create_node(l[:-1]) for l in open(fn)],key=lambda x:x.id)
-    
+
     for l in lst:
         init_server(l,lst)
