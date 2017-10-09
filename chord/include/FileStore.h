@@ -15,7 +15,7 @@
 
 #ifdef _WIN32
   #pragma warning( push )
-  #pragma warning (disable : 4250 ) //inheriting methods via dominance
+  #pragma warning (disable : 4250 ) //inheriting methods via dominance 
 #endif
 
 class FileStoreIf {
@@ -27,6 +27,7 @@ class FileStoreIf {
   virtual void findSucc(NodeID& _return, const std::string& key) = 0;
   virtual void findPred(NodeID& _return, const std::string& key) = 0;
   virtual void getNodeSucc(NodeID& _return) = 0;
+  virtual void setPredecessor(const NodeID& node) = 0;
 };
 
 class FileStoreIfFactory {
@@ -72,6 +73,9 @@ class FileStoreNull : virtual public FileStoreIf {
     return;
   }
   void getNodeSucc(NodeID& /* _return */) {
+    return;
+  }
+  void setPredecessor(const NodeID& /* node */) {
     return;
   }
 };
@@ -709,6 +713,92 @@ class FileStore_getNodeSucc_presult {
 
 };
 
+typedef struct _FileStore_setPredecessor_args__isset {
+  _FileStore_setPredecessor_args__isset() : node(false) {}
+  bool node :1;
+} _FileStore_setPredecessor_args__isset;
+
+class FileStore_setPredecessor_args {
+ public:
+
+  FileStore_setPredecessor_args(const FileStore_setPredecessor_args&);
+  FileStore_setPredecessor_args& operator=(const FileStore_setPredecessor_args&);
+  FileStore_setPredecessor_args() {
+  }
+
+  virtual ~FileStore_setPredecessor_args() throw();
+  NodeID node;
+
+  _FileStore_setPredecessor_args__isset __isset;
+
+  void __set_node(const NodeID& val);
+
+  bool operator == (const FileStore_setPredecessor_args & rhs) const
+  {
+    if (!(node == rhs.node))
+      return false;
+    return true;
+  }
+  bool operator != (const FileStore_setPredecessor_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FileStore_setPredecessor_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class FileStore_setPredecessor_pargs {
+ public:
+
+
+  virtual ~FileStore_setPredecessor_pargs() throw();
+  const NodeID* node;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class FileStore_setPredecessor_result {
+ public:
+
+  FileStore_setPredecessor_result(const FileStore_setPredecessor_result&);
+  FileStore_setPredecessor_result& operator=(const FileStore_setPredecessor_result&);
+  FileStore_setPredecessor_result() {
+  }
+
+  virtual ~FileStore_setPredecessor_result() throw();
+
+  bool operator == (const FileStore_setPredecessor_result & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const FileStore_setPredecessor_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FileStore_setPredecessor_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class FileStore_setPredecessor_presult {
+ public:
+
+
+  virtual ~FileStore_setPredecessor_presult() throw();
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class FileStoreClient : virtual public FileStoreIf {
  public:
   FileStoreClient(boost::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -752,6 +842,9 @@ class FileStoreClient : virtual public FileStoreIf {
   void getNodeSucc(NodeID& _return);
   void send_getNodeSucc();
   void recv_getNodeSucc(NodeID& _return);
+  void setPredecessor(const NodeID& node);
+  void send_setPredecessor(const NodeID& node);
+  void recv_setPredecessor();
  protected:
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -773,6 +866,7 @@ class FileStoreProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_findSucc(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_findPred(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_getNodeSucc(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_setPredecessor(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   FileStoreProcessor(boost::shared_ptr<FileStoreIf> iface) :
     iface_(iface) {
@@ -782,6 +876,7 @@ class FileStoreProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["findSucc"] = &FileStoreProcessor::process_findSucc;
     processMap_["findPred"] = &FileStoreProcessor::process_findPred;
     processMap_["getNodeSucc"] = &FileStoreProcessor::process_getNodeSucc;
+    processMap_["setPredecessor"] = &FileStoreProcessor::process_setPredecessor;
   }
 
   virtual ~FileStoreProcessor() {}
@@ -868,6 +963,15 @@ class FileStoreMultiface : virtual public FileStoreIf {
     return;
   }
 
+  void setPredecessor(const NodeID& node) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->setPredecessor(node);
+    }
+    ifaces_[i]->setPredecessor(node);
+  }
+
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -916,6 +1020,9 @@ class FileStoreConcurrentClient : virtual public FileStoreIf {
   void getNodeSucc(NodeID& _return);
   int32_t send_getNodeSucc();
   void recv_getNodeSucc(NodeID& _return, const int32_t seqid);
+  void setPredecessor(const NodeID& node);
+  int32_t send_setPredecessor(const NodeID& node);
+  void recv_setPredecessor(const int32_t seqid);
  protected:
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

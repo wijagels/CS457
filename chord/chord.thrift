@@ -25,19 +25,20 @@ struct NodeID {
 service FileStore {
   void writeFile(1: RFile rFile)
     throws (1: SystemException systemException),
-  
+
   RFile readFile(1: string filename, 2: UserID owner)
     throws (1: SystemException systemException),
 
   void setFingertable(1: list<NodeID> node_list),
-  
-  NodeID findSucc(1: string key) 
+
+  NodeID findSucc(1: string key)
     throws (1: SystemException systemException),
 
-  NodeID findPred(1: string key) 
+  NodeID findPred(1: string key)
     throws (1: SystemException systemException),
 
-  NodeID getNodeSucc() 
+  NodeID getNodeSucc()
     throws (1: SystemException systemException),
 
+  void setPredecessor(1: NodeID node),
 }
