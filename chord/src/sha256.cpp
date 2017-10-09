@@ -15,7 +15,7 @@ std::string sha256(const std::string &message) {
   EVP_DigestFinal_ex(mdctx, digest, &digest_len);
   EVP_MD_CTX_destroy(mdctx);
   std::ostringstream os;
-  for (unsigned int i = 0; i < digest_len; i++) {
+  for (auto i = 0u; i < digest_len; i++) {
     char buf[3];
     std::snprintf(buf, sizeof(buf), "%02x", digest[i]);
     os << buf;
