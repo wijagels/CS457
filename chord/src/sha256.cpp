@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
-#include <boost/multiprecision/cpp_int.hpp>
 #include <sstream>
 #include <string>
 

@@ -15,11 +15,11 @@ add_executable(server src/FileStore_server.cpp)
 if(CMAKE_COMPILER_IS_GNUCXX)
     target_compile_options(${PROJECT_NAME_STR}
         PUBLIC
-        -g -Wall -Wextra -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef
+        -Wall -Wextra -Werror -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef
         )
     target_compile_options(server
         PUBLIC
-        -g -Wall -Wextra -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef
+        -Wall -Wextra -Werror -pedantic -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef
         )
 endif()
 
@@ -28,7 +28,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Thrift REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system filesystem)
 
-target_include_directories(${PROJECT_NAME_STR} PUBLIC include ${THRIFT_INCLUDE_DIR} ${BOOST_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME_STR} SYSTEM PUBLIC include ${THRIFT_INCLUDE_DIR} ${BOOST_INCLUDE_DIRS})
 target_include_directories(server PUBLIC include)
 
 target_link_libraries(${PROJECT_NAME_STR} PUBLIC OpenSSL::Crypto ${THRIFT_LIBS})

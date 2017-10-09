@@ -1,21 +1,17 @@
 #include "FileStore.h"
 #include "chord.h"
 #include "chord_types.h"
-#include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/make_shared.hpp>
 #include <iostream>
 #include <thrift/TToString.h>
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TFDTransport.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TTransportUtils.h>
-#include <thrift/transport/TFDTransport.h>
-#include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/protocol/TJSONProtocol.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 class FileStoreHandler : virtual public FileStoreIf {
   LocalNode d_node;
