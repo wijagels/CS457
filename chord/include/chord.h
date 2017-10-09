@@ -36,7 +36,6 @@ class LocalNode : NodeID {
 
   template <typename Node, typename = std::enable_if_t<std::is_assignable<NodeID, Node>::value>>
   void set_predecessor(Node &&node) noexcept(std::is_nothrow_assignable<NodeID, Node>::value) {
-    std::cout << node << std::endl;
     d_predecessor = std::forward<Node>(node);
   }
 
@@ -70,7 +69,7 @@ class LocalNode : NodeID {
     }
     auto &candidate = d_fingertable.front();
     for (const auto &node : d_fingertable) {
-      if (id_less(candidate.id, _key)) break;
+      if (id_less(_key, candidate.id)) break;
       candidate = node;
     }
     call_rpc(candidate.ip, candidate.port, &FileStoreClient::findSucc, _return, _key);
@@ -114,13 +113,13 @@ class LocalNode : NodeID {
     return lhi < rhi;
   }
 
-  static bool id_between(const std::string &f, const std::string &s, const std::string &t) {
+  static bool id_between(const std::string &lower, const std::string &middle, const std::string &upper) {
     using boost::multiprecision::uint256_t;
-    uint256_t fi{"0x" + f};
-    uint256_t si{"0x" + s};
-    uint256_t ti{"0x" + t};
-    if (fi < si) return fi < ti && ti < si;
-    return !(si < ti && ti < fi);
+    uint256_t low{"0x" + lower};
+    uint256_t mid{"0x" + middle};
+    uint256_t up{"0x" + upper};
+    if (low < up) return low < mid && mid < up;
+    return !(up < mid && mid < low);
   }
 
   template <class Fp, typename... Args>

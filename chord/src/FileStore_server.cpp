@@ -30,7 +30,9 @@ class FileStoreHandler : virtual public FileStoreIf {
     }
     file.__isset.meta = true;
     file.meta.__set_contentHash(sha256(file.content));
+    file.meta.__set_version(0);
 
+    boost::filesystem::remove(id); // Delete file before writing
     using namespace ::apache::thrift::transport;
     using namespace ::apache::thrift::protocol;
     auto transport = boost::make_shared<TFileTransport>(id);
