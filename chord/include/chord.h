@@ -113,7 +113,8 @@ class LocalNode : NodeID {
     return lhi < rhi;
   }
 
-  static bool id_between(const std::string &lower, const std::string &middle, const std::string &upper) {
+  static bool id_between(const std::string &lower, const std::string &middle,
+                         const std::string &upper) {
     using boost::multiprecision::uint256_t;
     uint256_t low{"0x" + lower};
     uint256_t mid{"0x" + middle};

@@ -13,6 +13,14 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
+#include <cstdio>
+extern "C" {
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <string.h>
+}
+
 class FileStoreHandler : virtual public FileStoreIf {
   LocalNode d_node;
 
@@ -32,7 +40,7 @@ class FileStoreHandler : virtual public FileStoreIf {
     file.meta.__set_contentHash(sha256(file.content));
     file.meta.__set_version(0);
 
-    boost::filesystem::remove(id); // Delete file before writing
+    boost::filesystem::remove(id);  // Delete file before writing
     using namespace ::apache::thrift::transport;
     using namespace ::apache::thrift::protocol;
     auto transport = boost::make_shared<TFileTransport>(id);
@@ -86,6 +94,33 @@ class FileStoreHandler : virtual public FileStoreIf {
   }
 };
 
+/**
+ * Adapted from: https://stackoverflow.com/a/265978/1666415
+ * This works well enough but it's kind of a hack.
+ * A better way to do this would be with a configuration file,
+ * especially since the node's identifier depends on its address.
+ */
+static std::string get_public_ip() {
+  ifaddrs* ifAddrStruct = nullptr;
+  ifaddrs* ifa = nullptr;
+  in_addr* tmpAddrPtr = nullptr;
+
+  getifaddrs(&ifAddrStruct);
+  for (ifa = ifAddrStruct; ifa; ifa = ifa->ifa_next) {
+    // We don't want interfaces with no address or loopback
+    if (!ifa->ifa_addr || !std::strcmp(ifa->ifa_name, "lo")) continue;
+    if (ifa->ifa_addr->sa_family == AF_INET) {
+      tmpAddrPtr = &(reinterpret_cast<sockaddr_in*>(ifa->ifa_addr))->sin_addr;
+      char addressBuffer[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+      return {addressBuffer};
+    }
+  }
+  SystemException se;
+  se.__set_message("Unable to find an address to bind to");
+  throw se;
+}
+
 int main(int argc, char** argv) {
   using namespace ::apache::thrift;
   using namespace ::apache::thrift::protocol;
@@ -98,9 +133,11 @@ int main(int argc, char** argv) {
     exit(1);
   }
   int port = atoi(argv[1]);
-  auto handler = make_shared<FileStoreHandler>("127.0.0.1", port);
+  auto ip = get_public_ip();
+  printf("Server starting on %s:%d\n", ip.c_str(), port);
+  auto handler = make_shared<FileStoreHandler>(ip.c_str(), port);
   auto processor = make_shared<FileStoreProcessor>(handler);
-  auto serverTransport = make_shared<TServerSocket>(port);
+  auto serverTransport = make_shared<TServerSocket>(ip.c_str(), port);
   auto transportFactory = make_shared<TBufferedTransportFactory>();
   auto protocolFactory = make_shared<TBinaryProtocolFactory>();
 
