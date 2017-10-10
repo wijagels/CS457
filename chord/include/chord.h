@@ -5,7 +5,6 @@
 #include "chord_types.h"
 #include "sha256.hpp"
 #include <boost/make_shared.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
 #include <boost/optional.hpp>
 #include <thrift/TToString.h>
 #include <thrift/protocol/TBinaryProtocol.h>
@@ -114,21 +113,10 @@ class LocalNode : public NodeID {
   std::vector<NodeID> d_fingertable;
   boost::optional<NodeID> d_predecessor;
 
-  static bool id_less(const std::string &lhs, const std::string &rhs) {
-    using boost::multiprecision::uint256_t;
-    uint256_t lhi{"0x" + lhs};
-    uint256_t rhi{"0x" + rhs};
-    return lhi < rhi;
-  }
-
   static bool id_between(const std::string &lower, const std::string &middle,
                          const std::string &upper) {
-    using boost::multiprecision::uint256_t;
-    uint256_t low{"0x" + lower};
-    uint256_t mid{"0x" + middle};
-    uint256_t up{"0x" + upper};
-    if (low < up) return low < mid && mid < up;
-    return !(up < mid && mid < low);
+    if (lower < upper) return lower < middle && middle < upper;
+    return !(upper < middle && middle < lower);
   }
 
   template <class Fp, typename... Args>
