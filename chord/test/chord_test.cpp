@@ -18,13 +18,13 @@ using ::boost::make_shared;
  * Need to manually check if it was actually the right node.
  */
 TEST(chord_test, find_succ) {
-  auto socket = make_shared<TSocket>("127.0.0.1", 9091);
+  auto socket = make_shared<TSocket>("10.202.6.29", 9095);
   auto transport = make_shared<TBufferedTransport>(socket);
   auto protocol = make_shared<TBinaryProtocol>(transport);
   FileStoreClient client{protocol};
   transport->open();
   NodeID ret;
-  client.findSucc(ret, "55cd64297b4aa7bda529d6c069cb479a0ceb6743b9540682649c16978c7b078c");
+  client.findSucc(ret, "3cf3e4d6eaf91f7db4fe6a0b3f3867652fe918c6e2f2978c12c3da36a79ebcff");
   transport->close();
   std::cout << ret.ip << ":" << ret.port << "\n";
 }
@@ -33,7 +33,7 @@ TEST(chord_test, find_succ) {
  * Check that we can write contents to a file and read them back correctly.
  */
 TEST(chord_test, write_file) {
-  auto socket = make_shared<TSocket>("127.0.0.1", 9090);
+  auto socket = make_shared<TSocket>("10.202.6.29", 9092);
   auto transport = make_shared<TBufferedTransport>(socket);
   auto protocol = make_shared<TBinaryProtocol>(transport);
   FileStoreClient client{protocol};

@@ -86,6 +86,7 @@ class FileStoreHandler : virtual public FileStoreIf {
 
   void findSucc(NodeID& _return, const std::string& key) {
     printf("findSucc\n");
+    printf("%d\n", d_node.port);
     d_node.find_successor(_return, key);
   }
 
@@ -145,7 +146,8 @@ int main(int argc, char** argv) {
   }
   int port = atoi(argv[1]);
   auto ip = get_public_ip();
-  printf("Server starting on %s:%d\n", ip.c_str(), port);
+  auto id = sha256(ip + ":" + std::to_string(port));
+  printf("Server starting on %s:%d I am %s\n", ip.c_str(), port, id.c_str());
   auto handler = make_shared<FileStoreHandler>(ip.c_str(), port);
   auto processor = make_shared<FileStoreProcessor>(handler);
   auto serverTransport = make_shared<TServerSocket>(ip.c_str(), port);

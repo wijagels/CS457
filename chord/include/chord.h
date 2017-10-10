@@ -13,7 +13,7 @@
 #include <thrift/transport/TTransportUtils.h>
 #include <vector>
 
-class LocalNode : NodeID {
+class LocalNode : public NodeID {
  public:
   LocalNode(const std::string &address, int m_port) {
     NodeID::ip = address;
@@ -30,7 +30,8 @@ class LocalNode : NodeID {
       n.id = sha256(n.ip + ":" + std::to_string(n.port));
     }
     NodeID node = *this;
-    call_rpc(d_fingertable.front().ip, d_fingertable.front().port, &FileStoreClient::setPredecessor,
+    auto successor = d_fingertable.front();
+    call_rpc(successor.ip, successor.port, &FileStoreClient::setPredecessor,
              node);
   }
 
@@ -64,17 +65,25 @@ class LocalNode : NodeID {
     }
     if (d_fingertable.empty()) {
       SystemException se{};
-      se.__set_message("Unknown successor, can't find successor");
+      se.__set_message("No fingertable, can't find successor");
       throw se;
     }
     auto &candidate = d_fingertable.front();
+    auto &last = d_fingertable.front().id;
     for (const auto &node : d_fingertable) {
-      if (id_less(_key, candidate.id)) break;
-      candidate = node;
+      if (id_between(last, _key, node.id)) {
+        candidate = node;
+        break;
+      }
+      last = node.id;
     }
+    std::cout << candidate << std::endl;
     call_rpc(candidate.ip, candidate.port, &FileStoreClient::findSucc, _return, _key);
   }
 
+  /**
+   * TODO: fix
+   */
   void find_predecessor(NodeID &_return, const std::string &_key) {
     if (is_predecessor(_key)) {
       _return = *this;
@@ -86,9 +95,9 @@ class LocalNode : NodeID {
       throw se;
     }
     auto &candidate = d_fingertable.front();
-    for (const auto &node : d_fingertable) {
+    for (auto &node : d_fingertable) {
       candidate = node;
-      if (id_less(candidate.id, _key)) break;
+      if (id_between(this->id, candidate.id, _key)) break;
     }
     call_rpc(candidate.ip, candidate.port, &FileStoreClient::findPred, _return, _key);
   }
