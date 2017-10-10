@@ -42,7 +42,7 @@ TEST(chord_test, write_file) {
     RFile file;
     file.__isset.meta = true;
     file.__set_content("Hello, world!");
-    file.meta.__set_owner("guesttttttttt");
+    file.meta.__set_owner("guest");
     file.meta.__set_filename("test.txt");
     client.writeFile(file);
   }

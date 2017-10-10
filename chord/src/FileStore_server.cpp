@@ -3,7 +3,7 @@
 #include "chord_types.h"
 #include <boost/filesystem.hpp>
 #include <boost/make_shared.hpp>
-#include <iostream>
+#include <mutex>
 #include <thrift/TToString.h>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/protocol/TJSONProtocol.h>
@@ -23,6 +23,7 @@ extern "C" {
 
 class FileStoreHandler : virtual public FileStoreIf {
   LocalNode d_node;
+  std::recursive_mutex d_file_mtx;  // A thoroughly lazy approach to fixing race conditions
 
  public:
   FileStoreHandler(const std::string& address, int port) : d_node{address, port} {}
@@ -40,7 +41,15 @@ class FileStoreHandler : virtual public FileStoreIf {
     file.meta.__set_contentHash(sha256(file.content));
     file.meta.__set_version(0);
 
-    boost::filesystem::remove(id);  // Delete file before writing
+    std::lock_guard<std::recursive_mutex> lock{d_file_mtx};  // Take lock a-la RAII
+
+    if (boost::filesystem::exists(id)) {  // Read first to get the file version
+      RFile old;
+      readFile(old, file.meta.filename, file.meta.owner);
+      file.meta.__set_version(old.meta.version + 1);
+      boost::filesystem::remove(id);  // Delete file before writing
+    }
+
     using namespace ::apache::thrift::transport;
     using namespace ::apache::thrift::protocol;
     auto transport = boost::make_shared<TFileTransport>(id);
@@ -56,6 +65,8 @@ class FileStoreHandler : virtual public FileStoreIf {
       se.__set_message("Node is not owner of file");
       throw se;
     }
+
+    std::lock_guard<std::recursive_mutex> lock{d_file_mtx};
     if (!boost::filesystem::exists(id)) {
       SystemException se{};
       se.__set_message("File does not exist");
