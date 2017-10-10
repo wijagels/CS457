@@ -31,8 +31,7 @@ class LocalNode : public NodeID {
     }
     NodeID node = *this;
     auto successor = d_fingertable.front();
-    call_rpc(successor.ip, successor.port, &FileStoreClient::setPredecessor,
-             node);
+    call_rpc(successor.ip, successor.port, &FileStoreClient::setPredecessor, node);
   }
 
   template <typename Node, typename = std::enable_if_t<std::is_assignable<NodeID, Node>::value>>
@@ -50,7 +49,7 @@ class LocalNode : public NodeID {
   }
 
   bool is_predecessor(const std::string &identifier) {
-    if (!d_fingertable.empty()) {
+    if (d_fingertable.empty()) {
       SystemException se{};
       se.__set_message("Unknown successor, can't determine if is predecessor");
       throw se;
@@ -70,20 +69,16 @@ class LocalNode : public NodeID {
     }
     auto &candidate = d_fingertable.front();
     auto &last = d_fingertable.front().id;
-    for (const auto &node : d_fingertable) {
+    for (auto &node : d_fingertable) {
       if (id_between(last, _key, node.id)) {
         candidate = node;
         break;
       }
       last = node.id;
     }
-    std::cout << candidate << std::endl;
     call_rpc(candidate.ip, candidate.port, &FileStoreClient::findSucc, _return, _key);
   }
 
-  /**
-   * TODO: fix
-   */
   void find_predecessor(NodeID &_return, const std::string &_key) {
     if (is_predecessor(_key)) {
       _return = *this;
@@ -95,9 +90,13 @@ class LocalNode : public NodeID {
       throw se;
     }
     auto &candidate = d_fingertable.front();
+    auto &last = d_fingertable.front();
     for (auto &node : d_fingertable) {
-      candidate = node;
-      if (id_between(this->id, candidate.id, _key)) break;
+      if (id_between(last.id, _key, node.id)) {
+        candidate = last;
+        break;
+      }
+      last = node;
     }
     call_rpc(candidate.ip, candidate.port, &FileStoreClient::findPred, _return, _key);
   }
@@ -141,9 +140,9 @@ class LocalNode : public NodeID {
     auto transport = boost::make_shared<TBufferedTransport>(socket);
     auto protocol = boost::make_shared<TBinaryProtocol>(transport);
     FileStoreClient client(protocol);
-    auto f = std::bind(fn, &client, (std::ref(args))...);
     transport->open();
-    f();
+    // Pointer to member function magic
+    (client.*fn)(std::forward<Args>(args)...);
     transport->close();
   }
 };

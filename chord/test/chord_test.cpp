@@ -18,15 +18,31 @@ using ::boost::make_shared;
  * Need to manually check if it was actually the right node.
  */
 TEST(chord_test, find_succ) {
-  auto socket = make_shared<TSocket>("10.202.6.29", 9095);
-  auto transport = make_shared<TBufferedTransport>(socket);
-  auto protocol = make_shared<TBinaryProtocol>(transport);
-  FileStoreClient client{protocol};
-  transport->open();
-  NodeID ret;
-  client.findSucc(ret, "3cf3e4d6eaf91f7db4fe6a0b3f3867652fe918c6e2f2978c12c3da36a79ebcff");
-  transport->close();
-  std::cout << ret.ip << ":" << ret.port << "\n";
+  for (int i = 9090; i <= 9099; i++) {
+    auto socket = make_shared<TSocket>("10.202.6.29", i);
+    auto transport = make_shared<TBufferedTransport>(socket);
+    auto protocol = make_shared<TBinaryProtocol>(transport);
+    FileStoreClient client{protocol};
+    transport->open();
+    NodeID ret;
+    client.findSucc(ret, "3cf3e4d6eaf91f7db4fe6a0b3f3867652fe918c6e2f2978c12c3da36a79ebcff");
+    transport->close();
+    EXPECT_EQ(ret.port, 9092);
+  }
+}
+
+TEST(chord_test, find_pred) {
+  for (int i = 9090; i <= 9099; i++) {
+    auto socket = make_shared<TSocket>("10.202.6.29", i);
+    auto transport = make_shared<TBufferedTransport>(socket);
+    auto protocol = make_shared<TBinaryProtocol>(transport);
+    FileStoreClient client{protocol};
+    transport->open();
+    NodeID ret;
+    client.findPred(ret, "3cf3e4d6eaf91f7db4fe6a0b3f3867652fe918c6e2f2978c12c3da36a79ebcff");
+    transport->close();
+    EXPECT_EQ(ret.port, 9093);
+  }
 }
 
 /**
