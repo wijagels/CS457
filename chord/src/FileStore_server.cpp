@@ -86,7 +86,6 @@ class FileStoreHandler : virtual public FileStoreIf {
 
   void findSucc(NodeID& _return, const std::string& key) {
     printf("findSucc\n");
-    printf("%d\n", d_node.port);
     d_node.find_successor(_return, key);
   }
 

@@ -66,16 +66,8 @@ class LocalNode : public NodeID {
       se.__set_message("No fingertable, can't find successor");
       throw se;
     }
-    auto &candidate = d_fingertable.front();
-    auto &last = d_fingertable.front().id;
-    for (auto &node : d_fingertable) {
-      if (id_between(last, _key, node.id)) {
-        candidate = node;
-        break;
-      }
-      last = node.id;
-    }
-    call_rpc(candidate.ip, candidate.port, &FileStoreClient::findSucc, _return, _key);
+    auto node = closest_preceding_node(_key);
+    call_rpc(node.ip, node.port, &FileStoreClient::findSucc, _return, _key);
   }
 
   void find_predecessor(NodeID &_return, const std::string &_key) {
@@ -88,16 +80,8 @@ class LocalNode : public NodeID {
       se.__set_message("Unknown successor, can't find successor");
       throw se;
     }
-    auto &candidate = d_fingertable.front();
-    auto &last = d_fingertable.front();
-    for (auto &node : d_fingertable) {
-      if (id_between(last.id, _key, node.id)) {
-        candidate = last;
-        break;
-      }
-      last = node;
-    }
-    call_rpc(candidate.ip, candidate.port, &FileStoreClient::findPred, _return, _key);
+    auto node = closest_preceding_node(_key);
+    call_rpc(node.ip, node.port, &FileStoreClient::findPred, _return, _key);
   }
 
   void get_successor(NodeID &_return) {
@@ -117,6 +101,16 @@ class LocalNode : public NodeID {
                          const std::string &upper) {
     if (lower < upper) return lower < middle && middle < upper;
     return !(upper < middle && middle < lower);
+  }
+
+  NodeID closest_preceding_node(const std::string &_key) {
+    for (auto iter = d_fingertable.rbegin(); iter != d_fingertable.rend(); ++iter) {
+      auto node = *iter;
+      if (id_between(this->id, node.id, _key)) {
+        return node;
+      }
+    }
+    return d_fingertable.front();
   }
 
   template <class Fp, typename... Args>
