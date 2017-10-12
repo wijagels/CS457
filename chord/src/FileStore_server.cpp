@@ -1,7 +1,8 @@
 #include "FileStore.h"
 #include "chord.h"
-#include "netutils.h"
 #include "chord_types.h"
+#include "debug.h"
+#include "netutils.h"
 #include <boost/filesystem.hpp>
 #include <boost/make_shared.hpp>
 #include <mutex>
@@ -22,7 +23,7 @@ class FileStoreHandler : virtual public FileStoreIf {
   FileStoreHandler(const std::string& address, int port) : d_node{address, port} {}
 
   void writeFile(const RFile& rFile) {
-    printf("writeFile\n");
+    logd("writeFile\n");
     RFile file{rFile};
     auto id = sha256(file.meta.filename + ":" + file.meta.owner);
     if (!d_node.is_successor(id)) {
@@ -51,7 +52,7 @@ class FileStoreHandler : virtual public FileStoreIf {
   }
 
   void readFile(RFile& _return, const std::string& filename, const UserID& owner) {
-    printf("readFile\n");
+    logd("readFile\n");
     auto id = sha256(filename + ":" + owner);
     if (!d_node.is_successor(id)) {
       SystemException se{};
@@ -73,27 +74,27 @@ class FileStoreHandler : virtual public FileStoreIf {
   }
 
   void setFingertable(const std::vector<NodeID>& node_list) {
-    printf("setFingertable\n");
+    logd("setFingertable\n");
     d_node.set_fingertable(node_list);
   }
 
   void findSucc(NodeID& _return, const std::string& key) {
-    printf("findSucc\n");
+    logd("findSucc\n");
     d_node.find_successor(_return, key);
   }
 
   void findPred(NodeID& _return, const std::string& key) {
-    printf("findPred\n");
+    logd("findPred\n");
     d_node.find_predecessor(_return, key);
   }
 
   void getNodeSucc(NodeID& _return) {
-    printf("getNodeSucc\n");
+    logd("getNodeSucc\n");
     d_node.get_successor(_return);
   }
 
   void setPredecessor(const NodeID& node) {
-    printf("setPredecessor\n");
+    logd("setPredecessor\n");
     d_node.set_predecessor(node);
   }
 };
