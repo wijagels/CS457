@@ -1,5 +1,6 @@
 #include "FileStore.h"
 #include "chord.h"
+#include "netutils.h"
 #include "chord_types.h"
 #include <boost/filesystem.hpp>
 #include <boost/make_shared.hpp>
@@ -12,14 +13,6 @@
 #include <thrift/transport/TFDTransport.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TTransportUtils.h>
-
-#include <cstdio>
-extern "C" {
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <netinet/in.h>
-#include <string.h>
-}
 
 class FileStoreHandler : virtual public FileStoreIf {
   LocalNode d_node;
@@ -104,33 +97,6 @@ class FileStoreHandler : virtual public FileStoreIf {
     d_node.set_predecessor(node);
   }
 };
-
-/**
- * Adapted from: https://stackoverflow.com/a/265978/1666415
- * This works well enough but it's kind of a hack.
- * A better way to do this would be with a configuration file,
- * especially since the node's identifier depends on its address.
- */
-static std::string get_public_ip() {
-  ifaddrs* ifAddrStruct = nullptr;
-  ifaddrs* ifa = nullptr;
-  in_addr* tmpAddrPtr = nullptr;
-
-  getifaddrs(&ifAddrStruct);
-  for (ifa = ifAddrStruct; ifa; ifa = ifa->ifa_next) {
-    // We don't want interfaces with no address or loopback
-    if (!ifa->ifa_addr || !std::strcmp(ifa->ifa_name, "lo")) continue;
-    if (ifa->ifa_addr->sa_family == AF_INET) {
-      tmpAddrPtr = &(reinterpret_cast<sockaddr_in*>(ifa->ifa_addr))->sin_addr;
-      char addressBuffer[INET_ADDRSTRLEN];
-      inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-      return {addressBuffer};
-    }
-  }
-  SystemException se;
-  se.__set_message("Unable to find an address to bind to");
-  throw se;
-}
 
 int main(int argc, char** argv) {
   using namespace ::apache::thrift;

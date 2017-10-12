@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_library(${PROJECT_NAME_STR} src/chord_constants.cpp src/chord_types.cpp src/FileStore.cpp src/sha256.cpp)
-add_executable(server src/FileStore_server.cpp)
+add_executable(server src/FileStore_server.cpp src/netutils.cpp)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     target_compile_options(${PROJECT_NAME_STR}
