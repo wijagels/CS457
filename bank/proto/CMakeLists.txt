@@ -1,0 +1,7 @@
+find_package(Protobuf REQUIRED)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS bank.proto)
+add_library(proto ${PROTO_SRCS})
+get_filename_component(PARENT_DIR ${CMAKE_CURRENT_BINARY_DIR} DIRECTORY)
+target_include_directories(proto SYSTEM PUBLIC ${PARENT_DIR})
+target_compile_definitions(proto PUBLIC PROTOBUF_INLINE_NOT_IN_HEADERS=0)
+target_link_libraries(proto INTERFACE protobuf::libprotobuf)
