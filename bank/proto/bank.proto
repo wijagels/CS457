@@ -1,4 +1,5 @@
 syntax = "proto3";
+option optimize_for = LITE_RUNTIME;
 
 message InitBranch {
   uint64 balance = 1;
