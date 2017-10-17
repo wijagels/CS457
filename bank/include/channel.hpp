@@ -1,3 +1,5 @@
+#ifndef INCLUDE_CHANNEL_HPP_
+#define INCLUDE_CHANNEL_HPP_
 #include "proto/bank.pb.h"
 #include <string>
 #include <zmq.hpp>
@@ -14,3 +16,4 @@ class channel {
   zmq::context_t d_context;
   zmq::socket_t d_socket;
 };
+#endif

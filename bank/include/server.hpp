@@ -1,3 +1,5 @@
+#ifndef INCLUDE_SERVER_HPP_
+#define INCLUDE_SERVER_HPP_
 #include "proto/bank.pb.h"
 #include <zmq.hpp>
 
@@ -37,3 +39,4 @@ class server {
   zmq::context_t d_context;
   zmq::socket_t d_socket;
 };
+#endif
