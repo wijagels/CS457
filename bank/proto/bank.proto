@@ -1,5 +1,4 @@
 syntax = "proto3";
-option optimize_for = LITE_RUNTIME;
 
 message InitBranch {
   uint64 balance = 1;
@@ -31,9 +30,13 @@ message RetrieveSnapshot {
 
 message ReturnSnapshot {
   message LocalSnapshot{
+    message ChannelState {
+      string name = 1;
+      uint64 in_transit = 2;
+    }
     uint64 snapshot_id = 1;
     uint64 balance = 2;
-    repeated uint64 channel_state = 3;
+    repeated ChannelState channel_state = 3;
   }
 
   LocalSnapshot local_snapshot = 1;
