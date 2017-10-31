@@ -43,7 +43,7 @@ class Channel : public std::enable_shared_from_this<Channel> {
         });
   }
 
-  auto peer() { return d_socket.remote_endpoint(); }
+  auto &handler() { return d_msg_handler; }
 
  protected:
   void serve_request();

@@ -133,4 +133,8 @@ void Controller::return_snapshot_handler(const ReturnSnapshot &msg) {
   std::string s;
   google::protobuf::TextFormat::PrintToString(msg, &s);
   std::cout << s << '\n';
+  auto snap = msg.local_snapshot();
+  for (int i = 0; i < snap.channel_state_size(); i++) {
+    std::cout << snap.channel_state(i).in_transit() << std::endl;
+  }
 }

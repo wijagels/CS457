@@ -42,6 +42,10 @@ message ReturnSnapshot {
   LocalSnapshot local_snapshot = 1;
 }
 
+message Hello {
+    string name = 1;
+}
+
 message BranchMessage {
   oneof branch_message {
     InitBranch init_branch = 1;
@@ -50,6 +54,7 @@ message BranchMessage {
     Marker marker = 4;
     RetrieveSnapshot retrieve_snapshot = 5;
     ReturnSnapshot return_snapshot = 6;
+    Hello hello = 7;
   }
 }
 

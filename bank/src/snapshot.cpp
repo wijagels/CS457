@@ -1,11 +1,18 @@
 #include "snapshot.hpp"
 
-Snapshot::CompletedState::CompletedState(const RecordingState &rs) : d_transferred{rs.transferred} {}
+Snapshot::CompletedState::CompletedState(const RecordingState &rs)
+    : d_transferred{rs.transferred} {}
 
 uint64_t Snapshot::CompletedState::transferred() const { return d_transferred; }
 
 Snapshot::Snapshot(size_t n, uint64_t id, uint64_t balance)
     : d_states{n}, d_id{id}, d_balance{balance} {}
+
+void Snapshot::initialize(const std::vector<std::string> &peers) {
+  for (const auto &e : peers) {
+    d_states.emplace(e, RecordingState{});
+  }
+}
 
 uint64_t Snapshot::id() { return d_id; }
 
@@ -16,15 +23,14 @@ void Snapshot::record_tx(const std::string &from, uint64_t amount) {
   }  // else no-op
 }
 
-void Snapshot::start_recording(const std::string &from) {
+void Snapshot::marker(const std::string &from) {
   auto &s = d_states.at(from);
-  boost::get<EmptyState>(s);  // Enforce previous state
-  s = RecordingState{};
-}
-
-void Snapshot::stop_recording(const std::string &from) {
-  auto &s = d_states.at(from);
-  s = CompletedState{boost::get<RecordingState>(s)};
+  if (s.type() == typeid(EmptyState)) {
+    boost::get<EmptyState>(s);
+    s = RecordingState{};
+  } else {
+    s = CompletedState{boost::get<RecordingState>(s)};
+  }
 }
 
 ReturnSnapshot Snapshot::to_message() noexcept(false) {

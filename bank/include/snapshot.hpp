@@ -3,6 +3,7 @@
 #include "proto/bank.pb.h"
 #include <string>
 #include <unordered_map>
+#include <vector>
 /* std::variant is unavailable on shitmote */
 #include <boost/variant.hpp>
 #include <boost/variant/get.hpp>
@@ -23,13 +24,13 @@ class Snapshot {
  public:
   Snapshot(size_t n, uint64_t id, uint64_t balance);
 
+  void initialize(const std::vector<std::string> &peers);
+
   uint64_t id();
 
   void record_tx(const std::string &from, uint64_t amount);
 
-  void start_recording(const std::string &from);
-
-  void stop_recording(const std::string &from);
+  void marker(const std::string &from);
 
   ReturnSnapshot to_message() noexcept(false);
 

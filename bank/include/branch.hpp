@@ -20,36 +20,36 @@ class Branch : public std::enable_shared_from_this<Branch> {
   Branch &operator=(const Branch &) = delete;
   Branch &operator=(Branch &&) = delete;
 
-  void handle_message(const BranchMessage &msg);
-
   void start();
 
  protected:
-  std::function<void(const BranchMessage &)> d_message_handler = [this](const BranchMessage &msg) {
-    handle_message(msg);
-  };
+  /*                           name       , ip         , port    */
+  using peer_info = std::tuple<std::string, std::string, uint16_t>;
+  using channel_info = std::pair<std::string, std::shared_ptr<Channel>>;
+
+  void message_handler(const BranchMessage &msg, const channel_info &ci);
 
   void do_send_money();
 
   void do_accept();
 
-  void match_peers();
+  // void match_peers();
 
-  void init_branch_handler(const InitBranch &msg);
+  void init_branch_handler(const InitBranch &msg, const channel_info &ci);
 
-  void init_snapshot_handler(const InitSnapshot &msg);
+  void init_snapshot_handler(const InitSnapshot &msg, const channel_info &ci);
 
-  void marker_handler(const Marker &msg);
+  void marker_handler(const Marker &msg, const channel_info &ci);
 
-  void retrieve_snapshot_handler(const RetrieveSnapshot &msg);
+  void retrieve_snapshot_handler(const RetrieveSnapshot &msg, const channel_info &ci);
 
-  void return_snapshot_handler(const ReturnSnapshot &msg);
+  void return_snapshot_handler(const ReturnSnapshot &msg, const channel_info &ci);
 
-  void transfer_handler(const Transfer &msg);
+  void transfer_handler(const Transfer &msg, const channel_info &ci);
+
+  void hello_handler(const Hello &msg, const channel_info &ci);
 
  private:
-  /*                           name       , ip         , port    */
-  using peer_info = std::tuple<std::string, std::string, uint16_t>;
   const std::string d_name;
   std::unordered_map<std::string, std::shared_ptr<Channel>> d_channels;
   std::vector<peer_info> d_known_peers;
