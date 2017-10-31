@@ -4,9 +4,9 @@
 #include "snapshot.hpp"
 #include <atomic>
 #include <boost/asio.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <random>
 #include <vector>
-
-class Channel;
 
 class Branch : public std::enable_shared_from_this<Branch> {
  public:
@@ -25,6 +25,12 @@ class Branch : public std::enable_shared_from_this<Branch> {
   void start();
 
  protected:
+  std::function<void(const BranchMessage &)> d_message_handler = [this](const BranchMessage &msg) {
+    handle_message(msg);
+  };
+
+  void do_send_money();
+
   void do_accept();
 
   void match_peers();
@@ -54,6 +60,11 @@ class Branch : public std::enable_shared_from_this<Branch> {
   boost::asio::ip::tcp::socket d_socket;
   std::vector<std::shared_ptr<Channel>> d_pending_peers;
   boost::asio::io_service &d_io_svc;
+  boost::asio::steady_timer d_timer;
+  std::random_device d_rd;
+  std::mt19937_64 d_gen;
+  boost::asio::ip::tcp::resolver d_resolver;
+  boost::asio::io_service::strand d_strand;
 };
 
 #endif

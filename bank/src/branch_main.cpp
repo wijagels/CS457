@@ -1,7 +1,7 @@
-#include "netutils.hpp"
 #include "branch.hpp"
-#include <thread>
+#include "netutils.hpp"
 #include <memory>
+#include <thread>
 
 int main(int argc, char *argv[]) {
   if (argc != 3) return 1;
@@ -12,5 +12,13 @@ int main(int argc, char *argv[]) {
   boost::asio::io_service io_service;
   std::shared_ptr<Branch> branch = std::make_shared<Branch>(name, endpoint, io_service);
   branch->start();
-  io_service.run();
+  auto worker = [&io_service]() { io_service.run(); };
+  std::thread t1{worker};
+  std::thread t2{worker};
+  std::thread t3{worker};
+  std::thread t4{worker};
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
 }

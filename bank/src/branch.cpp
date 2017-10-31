@@ -3,6 +3,7 @@
 #include "netutils.hpp"
 #include "proto/bank.pb.h"
 #include <boost/asio.hpp>
+#include <chrono>
 #include <google/protobuf/text_format.h>
 #include <iostream>
 #include <unordered_map>
@@ -13,19 +14,64 @@ Branch::Branch(std::string name, const tcp::endpoint &endpoint, boost::asio::io_
     : d_name{std::move(name)},
       d_acceptor{io_service, endpoint},
       d_socket{io_service},
-      d_io_svc{io_service} {}
+      d_io_svc{io_service},
+      d_timer{io_service},
+      d_rd{},
+      d_gen{d_rd()},
+      d_resolver{io_service},
+      d_strand{io_service} {}
 
-void Branch::start() { do_accept(); }
+void Branch::start() {
+  do_accept();
+  do_send_money();
+}
+
+void Branch::do_send_money() {
+  auto self = shared_from_this();
+  std::uniform_int_distribution<int> timer_dist(0, 5);
+  d_timer.expires_from_now(std::chrono::milliseconds(timer_dist(d_gen)));
+  d_timer.async_wait([this, self](boost::system::error_code ec) {
+    if (!ec && d_channels.size()) {
+      std::uniform_int_distribution<size_t> chan_dist{0, d_channels.size() - 1};
+      size_t i = chan_dist(d_gen);
+      for (auto & [ name, el ] : d_channels) {
+        if (i == 0) {
+          BranchMessage bm;
+          auto tr = bm.mutable_transfer();
+          uint64_t curr_money = d_money.load(std::memory_order_relaxed);
+          uint64_t to_send = 0;
+          for (;;) {
+            std::uniform_int_distribution<uint64_t> subtr_dist(0.01 * curr_money,
+                                                               0.05 * curr_money);
+            to_send = subtr_dist(d_gen);
+            uint64_t end_bal = curr_money - to_send;
+            if (to_send == 0) break;
+            if (end_bal > curr_money) continue;
+            if (d_money.compare_exchange_weak(curr_money, end_bal)) break;
+            /* L O C K  F R E E */
+          }
+          if (to_send > 0) {
+            tr->set_money(to_send);
+            el->send_branch_msg(bm);
+          }
+          break;
+        }
+        --i;
+      }
+    }
+    if (ec) std::cerr << ec.message() << std::endl;
+    do_send_money();
+  });
+}
 
 void Branch::do_accept() {
-  std::cout << "Here!" << std::endl;
   auto self = shared_from_this();
   d_acceptor.async_accept(d_socket, [this, self](boost::system::error_code ec) {
     if (!ec) {
-      auto ch = std::make_shared<Channel>(std::move(d_socket), self);
+      auto ch = std::make_shared<Channel>(std::move(d_socket), d_io_svc, d_message_handler);
       d_pending_peers.push_back(ch);
       ch->start();
-      match_peers();
+      d_strand.post([this, self]() { match_peers(); });
     }
     do_accept();
   });
@@ -67,29 +113,32 @@ void Branch::init_branch_handler(const InitBranch &msg) {
 
   auto iter = std::find_if(d_known_peers.begin(), d_known_peers.end(),
                            [=](const peer_info &x) { return std::get<0>(x) == d_name; });
-  if (iter == d_known_peers.end())
+  if (iter == d_known_peers.end()) {
     throw std::runtime_error{"Init branch message does not include me!"};
+  }
   const size_t offset = (iter - d_known_peers.begin());
-  tcp::resolver resolver{d_io_svc};
-  for (size_t i = offset; i < offset + outgoing; i++) {
+  for (size_t i = offset + 1; i < offset + outgoing + 1; i++) {
     const auto & [ name, ip, port ] = d_known_peers.at(i % d_known_peers.size());
-    auto ch = std::make_shared<Channel>(tcp::socket{d_io_svc}, self);
+    auto ch = std::make_shared<Channel>(d_io_svc, d_message_handler);
     d_channels.emplace(name, ch);
     tcp::endpoint peer{boost::asio::ip::address::from_string(ip), static_cast<uint16_t>(port)};
     tcp::resolver::query query{tcp::v4(), ip, std::to_string(static_cast<uint32_t>(port)),
                                tcp::resolver::query::numeric_service};
-    resolver.async_resolve(query,
-                           [ch](boost::system::error_code ec, tcp::resolver::iterator peers) {
-                             if (!ec) {
-                               ch->connect(peers);
-                             } else {
-                               throw std::runtime_error{"Unable to resolve peer: " + ec.message()};
-                             }
-                           });
+    d_resolver.async_resolve(
+        query, [this, ch, self](boost::system::error_code ec, tcp::resolver::iterator peers) {
+          if (!ec) {
+            ch->connect_cb(peers, d_strand.wrap([this, self]() { match_peers(); }));
+          } else {
+            throw std::runtime_error{"Unable to resolve peer: " + ec.message()};
+          }
+        });
   }
 }
 
 void Branch::init_snapshot_handler(const InitSnapshot &msg) {
+  std::string s;
+  google::protobuf::TextFormat::PrintToString(msg, &s);
+  std::cout << s << '\n';
   auto n = d_channels.size();
   auto id = msg.snapshot_id();
   auto bal = d_money.load(std::memory_order_relaxed);
@@ -114,9 +163,13 @@ void Branch::return_snapshot_handler(const ReturnSnapshot &msg) {
   std::cout << s << '\n';
 }
 
-void Branch::transfer_handler(const Transfer &msg) { d_money += msg.money(); }
+void Branch::transfer_handler(const Transfer &msg) {
+  std::cout << "incoing: " << msg.money() << std::endl;
+  d_money += msg.money();
+}
 
 void Branch::handle_message(const BranchMessage &msg) {
+  std::cout << d_money << std::endl;
   using MsgTypes = BranchMessage::BranchMessageCase;
   MsgTypes branch_msg = msg.branch_message_case();
   switch (branch_msg) {

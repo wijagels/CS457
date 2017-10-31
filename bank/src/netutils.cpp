@@ -23,6 +23,7 @@ std::string get_public_ip() {
       tmpAddrPtr = &(reinterpret_cast<sockaddr_in*>(ifa->ifa_addr))->sin_addr;
       char addressBuffer[INET_ADDRSTRLEN];
       inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+      ::freeifaddrs(ifAddrStruct);
       return {addressBuffer};
     }
   }

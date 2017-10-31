@@ -1,18 +1,19 @@
 #ifndef INCLUDE_CHANNEL_HPP_
 #define INCLUDE_CHANNEL_HPP_
-#include "proto/bank.pb.h"
 #include "message.hpp"
-#include "branch.hpp"
+#include "proto/bank.pb.h"
 #include <boost/asio.hpp>
 #include <deque>
 #include <memory>
 #include <string>
 
-class Branch;
-
 class Channel : public std::enable_shared_from_this<Channel> {
  public:
-  Channel(boost::asio::ip::tcp::socket socket, std::shared_ptr<Branch> branch);
+  Channel(boost::asio::ip::tcp::socket socket, boost::asio::io_service &io_service,
+          std::function<void(const BranchMessage &)> msg_handler);
+
+  Channel(boost::asio::io_service &io_service,
+          std::function<void(const BranchMessage &)> msg_handler);
 
   ~Channel() = default;
 
@@ -27,9 +28,22 @@ class Channel : public std::enable_shared_from_this<Channel> {
 
   void connect(const boost::asio::ip::tcp::resolver::iterator &endpoint);
 
-  auto peer() {
-    return d_socket.remote_endpoint();
+  template <typename Handler>
+  void connect_cb(const boost::asio::ip::tcp::resolver::iterator &endpoint, Handler &&handler) {
+    std::cout << "Connecting..." << std::endl;
+    boost::asio::async_connect(
+        d_socket, endpoint,
+        [this, handler](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator) {
+          if (!ec) {
+            d_socket.get_io_service().post(handler);
+            start();
+          } else {
+            throw std::runtime_error{"Unable to connect to peer: " + ec.message()};
+          }
+        });
   }
+
+  auto peer() { return d_socket.remote_endpoint(); }
 
  protected:
   void serve_request();
@@ -46,6 +60,7 @@ class Channel : public std::enable_shared_from_this<Channel> {
   boost::asio::ip::tcp::socket d_socket;
   std::deque<std::pair<std::shared_ptr<char[]>, size_t>> d_mq;
   BranchNetMsg d_msg;
-  std::shared_ptr<Branch> d_branch;
+  std::function<void(const BranchMessage &)> d_msg_handler;
+  boost::asio::strand d_strand;
 };
 #endif
