@@ -21,7 +21,7 @@ void Channel::send_branch_msg(const BranchMessage &msg) {
     msg.SerializeToArray(buf.get(), size);
     d_mq.emplace_back(buf, size);
     if (empty) {
-      d_strand.post([ this, self ]() { do_send(); });
+      do_send();
     }
   });
 }

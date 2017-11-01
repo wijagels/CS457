@@ -14,11 +14,11 @@ int main(int argc, char *argv[]) {
   branch->start();
   auto worker = [&io_service]() { io_service.run(); };
   std::thread t1{worker};
-  // std::thread t2{worker};
-  // std::thread t3{worker};
-  // std::thread t4{worker};
+  std::thread t2{worker};
+  std::thread t3{worker};
+  std::thread t4{worker};
   t1.join();
-  // t2.join();
-  // t3.join();
-  // t4.join();
+  t2.join();
+  t3.join();
+  t4.join();
 }

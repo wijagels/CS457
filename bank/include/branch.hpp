@@ -50,16 +50,15 @@ class Branch : public std::enable_shared_from_this<Branch> {
   void hello_handler(const Hello &msg, const channel_info &ci);
 
  private:
-  const std::string d_name;
+  const std::string c_name;
   std::unordered_map<std::string, std::shared_ptr<Channel>> d_channels;
   std::vector<peer_info> d_known_peers;
   std::atomic_uint64_t d_money = 0;
-  std::optional<Snapshot> d_snapshot;
-  boost::asio::io_service d_iosvc;
+  std::shared_ptr<Snapshot> d_snapshot;
   boost::asio::ip::tcp::acceptor d_acceptor;
   boost::asio::ip::tcp::socket d_socket;
   std::vector<std::shared_ptr<Channel>> d_pending_peers;
-  boost::asio::io_service &d_io_svc;
+  boost::asio::io_service &d_io_service;
   boost::asio::steady_timer d_timer;
   std::random_device d_rd;
   std::mt19937_64 d_gen;

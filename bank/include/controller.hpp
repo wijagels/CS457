@@ -4,10 +4,10 @@
 #include "proto/bank.pb.h"
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <memory>
 #include <string_view>
 #include <tuple>
 #include <vector>
-#include <memory>
 
 class Controller : public std::enable_shared_from_this<Controller> {
  public:
@@ -22,15 +22,11 @@ class Controller : public std::enable_shared_from_this<Controller> {
 
   void do_snapshot();
 
-  void do_retrieve_snapshot(size_t which_branch);
+  void do_retrieve_snapshot();
 
   void handle_message(const BranchMessage &msg);
 
   void return_snapshot_handler(const ReturnSnapshot &msg);
-
-  std::function<void(const BranchMessage &)> d_msg_handler = [this] (const BranchMessage &msg) {
-    this->handle_message(msg);
-  };
 
   using peerinfo = std::tuple<std::string, std::string, uint16_t>;
   std::vector<peerinfo> d_peers;

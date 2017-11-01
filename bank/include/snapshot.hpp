@@ -1,12 +1,11 @@
 #ifndef INCLUDE_SNAPSHOT_HPP_
 #define INCLUDE_SNAPSHOT_HPP_
 #include "proto/bank.pb.h"
+#include <atomic>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
-/* std::variant is unavailable on shitmote */
-#include <boost/variant.hpp>
-#include <boost/variant/get.hpp>
 
 class Snapshot {
   struct EmptyState {};
@@ -15,10 +14,7 @@ class Snapshot {
   };
   struct CompletedState {
     explicit CompletedState(const RecordingState &rs);
-    uint64_t transferred() const;
-
-   private:
-    uint64_t d_transferred;
+    const uint64_t transferred;
   };
 
  public:
@@ -32,13 +28,13 @@ class Snapshot {
 
   void marker(const std::string &from);
 
-  ReturnSnapshot to_message() noexcept(false);
+  ReturnSnapshot to_message();
 
  private:
-  using varstate = boost::variant<EmptyState, RecordingState, CompletedState>;
+  using varstate = std::variant<EmptyState, RecordingState, CompletedState>;
   std::unordered_map<std::string, varstate> d_states;
-  uint64_t d_id;
-  uint64_t d_balance;
+  const uint64_t c_id;
+  const uint64_t c_balance;
 };
 
 #endif

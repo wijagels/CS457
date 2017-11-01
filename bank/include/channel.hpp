@@ -30,10 +30,11 @@ class Channel : public std::enable_shared_from_this<Channel> {
 
   template <typename Handler>
   void connect_cb(const boost::asio::ip::tcp::resolver::iterator &endpoint, Handler &&handler) {
-    std::cout << "Connecting..." << std::endl;
+    auto self = shared_from_this();
     boost::asio::async_connect(
         d_socket, endpoint,
-        [this, handler](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator) {
+        [this, self, handler](boost::system::error_code ec,
+                              boost::asio::ip::tcp::resolver::iterator) {
           if (!ec) {
             d_socket.get_io_service().post(handler);
             start();

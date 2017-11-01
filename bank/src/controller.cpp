@@ -54,8 +54,9 @@ void Controller::do_init_branches() {
   auto self = shared_from_this();
   using boost::asio::ip::tcp;
   for (const auto & [ name, ip, port ] : d_peers) {
-    auto ch = std::make_shared<Channel>(d_io_service, d_msg_handler);
-    d_channels.push_back(ch);
+    auto ch = std::make_shared<Channel>(
+        d_io_service, [this, self](const BranchMessage &msg) { this->handle_message(msg); });
+    d_channels.emplace_back(ch);
     tcp::resolver::query query{tcp::v4(), ip, std::to_string(static_cast<uint32_t>(port)),
                                tcp::resolver::query::numeric_service};
     d_resolver.async_resolve(
@@ -89,20 +90,23 @@ void Controller::do_snapshot() {
       std::uniform_int_distribution<size_t> dist{0, d_channels.size() - 1};
       size_t which = dist(gen);
       d_channels.at(which)->send_branch_msg(bm);
-      do_retrieve_snapshot(which);
+      do_retrieve_snapshot();
     }
   });
 }
 
-void Controller::do_retrieve_snapshot(size_t which_branch) {
+void Controller::do_retrieve_snapshot() {
   auto self = shared_from_this();
   d_timer.expires_from_now(std::chrono::seconds(10));
-  d_timer.async_wait([this, self, which_branch](boost::system::error_code ec) {
+  d_timer.async_wait([this, self](boost::system::error_code ec) {
     if (!ec) {
+      std::cout << "snapshot_id: " << d_snapshot_id << '\n';
       BranchMessage bm;
       auto retrieve = bm.mutable_retrieve_snapshot();
       retrieve->set_snapshot_id(d_snapshot_id);
-      d_channels.at(which_branch)->send_branch_msg(bm);
+      for (auto &branch : d_channels) {
+        branch->send_branch_msg(bm);
+      }
       do_snapshot();
     }
   });
@@ -130,11 +134,12 @@ void Controller::handle_message(const BranchMessage &msg) {
 }
 
 void Controller::return_snapshot_handler(const ReturnSnapshot &msg) {
-  std::string s;
-  google::protobuf::TextFormat::PrintToString(msg, &s);
-  std::cout << s << '\n';
-  auto snap = msg.local_snapshot();
+  const auto &snap = msg.local_snapshot();
+  const auto &name = msg.name();
+  std::cout << name << ": " << snap.balance();
   for (int i = 0; i < snap.channel_state_size(); i++) {
-    std::cout << snap.channel_state(i).in_transit() << std::endl;
+    const auto &row = snap.channel_state(i);
+    std::cout << ", " << row.name() << "->" << name << ": " << row.in_transit();
   }
+  std::cout << '\n';
 }

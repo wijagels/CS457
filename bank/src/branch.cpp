@@ -11,10 +11,10 @@
 using boost::asio::ip::tcp;
 
 Branch::Branch(std::string name, const tcp::endpoint &endpoint, boost::asio::io_service &io_service)
-    : d_name{std::move(name)},
+    : c_name{std::move(name)},
       d_acceptor{io_service, endpoint},
       d_socket{io_service},
-      d_io_svc{io_service},
+      d_io_service{io_service},
       d_timer{io_service},
       d_rd{},
       d_gen{d_rd()},
@@ -66,10 +66,10 @@ void Branch::do_send_money() {
 
 void Branch::do_accept() {
   auto self = shared_from_this();
-  d_acceptor.async_accept(d_socket, [this, self](boost::system::error_code ec) {
+  d_acceptor.async_accept(d_socket, d_strand.wrap([this, self](boost::system::error_code ec) {
     if (!ec) {
       auto ch = std::make_shared<Channel>(
-          std::move(d_socket), d_io_svc,
+          std::move(d_socket), d_io_service,
           [this, self](const BranchMessage &msg) { message_handler(msg, {}); });
       std::pair p{"", ch};
       ch->handler() = [this, self, p](const BranchMessage &m) { message_handler(m, p); };
@@ -77,39 +77,15 @@ void Branch::do_accept() {
       ch->start();
     }
     do_accept();
-  });
+  }));
 }
 
-#if 0
-void Branch::match_peers() {
-  auto self = shared_from_this();
-  auto it = std::remove_if(
-      std::begin(d_pending_peers), std::end(d_pending_peers),
-      [this, self](std::shared_ptr<Channel> &chan) {
-        for (const auto & [ name, address, port ] : d_known_peers) {
-          if (chan->peer().address() == boost::asio::ip::address::from_string(address) &&
-              chan->peer().port() == port) {
-            std::pair p{name, chan};
-            chan->handler() = [this, self, p](const BranchMessage &msg) {
-              message_handler(msg, p);
-            };
-            d_channels.emplace(name, chan);
-            return true;
-          }
-        }
-        return false;
-      });
-  d_pending_peers.erase(it, std::end(d_pending_peers));
-  std::cout << "PENDING: " << d_pending_peers.size() << std::endl;
-}
-#endif
-
-void Branch::init_branch_handler(const InitBranch &msg, const channel_info &ci) {
+void Branch::init_branch_handler(const InitBranch &msg, const channel_info &) {
   auto self = shared_from_this();
   d_money = msg.balance();
 
   const size_t num = msg.all_branches_size();
-  const size_t outgoing = (num - 1) / 2;
+  const size_t outgoing = ((num - 1) / 2);
 
   d_known_peers.reserve(num);
 
@@ -118,7 +94,7 @@ void Branch::init_branch_handler(const InitBranch &msg, const channel_info &ci) 
     d_known_peers.emplace_back(el.name(), el.ip(), el.port());
   }
   auto iter = std::find_if(d_known_peers.begin(), d_known_peers.end(),
-                           [=](const peer_info &x) { return std::get<0>(x) == d_name; });
+                           [=](const peer_info &x) { return std::get<0>(x) == c_name; });
   if (iter == d_known_peers.end()) {
     throw std::runtime_error{"Init branch message does not include me!"};
   }
@@ -126,56 +102,35 @@ void Branch::init_branch_handler(const InitBranch &msg, const channel_info &ci) 
   for (size_t i = offset + 1; i < offset + outgoing + 1; i++) {
     const auto & [ name, ip, port ] = d_known_peers.at(i % d_known_peers.size());
     auto ch = std::make_shared<Channel>(
-        d_io_svc, [this, self](const BranchMessage &m) { message_handler(m, {}); });
+        d_io_service, [this, self](const BranchMessage &m) { message_handler(m, {}); });
     std::pair p{name, ch};
     ch->handler() = [this, self, p](const BranchMessage &m) { message_handler(m, p); };
-    d_channels.emplace(name, ch);
     tcp::endpoint peer{boost::asio::ip::address::from_string(ip), static_cast<uint16_t>(port)};
     tcp::resolver::query query{tcp::v4(), ip, std::to_string(static_cast<uint32_t>(port)),
                                tcp::resolver::query::numeric_service};
-    d_resolver.async_resolve(
-        query, [this, ch, self](boost::system::error_code ec, tcp::resolver::iterator peers) {
-          if (!ec) {
-            ch->connect_cb(peers, [this, ch, self]() {
-              BranchMessage bm;
-              bm.mutable_hello()->set_name(d_name);
-              ch->send_branch_msg(bm);
-            });
-          } else {
-            throw std::runtime_error{"Unable to resolve peer: " + ec.message()};
-          }
+    d_resolver.async_resolve(query, [ this, name = name, ch, self ](boost::system::error_code ec,
+                                                                    tcp::resolver::iterator peers) {
+      if (!ec) {
+        ch->connect_cb(peers, [this, name, ch, self]() {
+          d_channels.emplace(name, ch);
+          BranchMessage bm;
+          bm.mutable_hello()->set_name(c_name);
+          ch->send_branch_msg(bm);
         });
+      } else {
+        throw std::runtime_error{"Unable to resolve peer: " + ec.message()};
+      }
+    });
   }
 }
 
 void Branch::init_snapshot_handler(const InitSnapshot &msg, const channel_info &) {
-  // std::string s;
-  // google::protobuf::TextFormat::PrintToString(msg, &s);
-  // std::cout << "InitSnapshot: " << s << '\n';
-  auto n = d_channels.size();
-  auto id = msg.snapshot_id();
-  auto bal = d_money.load(std::memory_order_relaxed);
-  d_snapshot = Snapshot{n, id, bal};
-  std::vector<std::string> v;
-  v.reserve(d_channels.size());
-  for (auto e : d_channels) {
-    v.push_back(e.first);
-  }
-  d_snapshot->initialize(v);
-
-  BranchMessage bm;
-  bm.mutable_marker()->set_snapshot_id(id);
-  for (auto & [ name, ch ] : d_channels) {
-    ch->send_branch_msg(bm);
-  }
-}
-
-void Branch::marker_handler(const Marker &msg, const channel_info &ci) {
-  // std::string s;
-  // google::protobuf::TextFormat::PrintToString(msg, &s);
-  // std::cout << "Marker " << s << '\n';
-  if (!d_snapshot.has_value() || msg.snapshot_id() != d_snapshot->id()) {
-    d_snapshot = Snapshot{d_channels.size(), msg.snapshot_id(), d_money};
+  auto self = shared_from_this();
+  d_strand.post([this, msg, self]() {
+    auto n = d_channels.size();
+    auto id = msg.snapshot_id();
+    auto bal = d_money.load(std::memory_order_relaxed);
+    d_snapshot = std::make_shared<Snapshot>(n, id, bal);
     std::vector<std::string> v;
     v.reserve(d_channels.size());
     for (auto e : d_channels) {
@@ -184,35 +139,54 @@ void Branch::marker_handler(const Marker &msg, const channel_info &ci) {
     d_snapshot->initialize(v);
 
     BranchMessage bm;
-    bm.mutable_marker()->set_snapshot_id(msg.snapshot_id());
+    bm.mutable_marker()->set_snapshot_id(id);
     for (auto & [ name, ch ] : d_channels) {
       ch->send_branch_msg(bm);
     }
-  } else {
+  });
+}
+
+void Branch::marker_handler(const Marker &msg, const channel_info &ci) {
+  auto self = shared_from_this();
+  d_strand.post([this, msg, ci, self]() {
+    std::string s;
+    google::protobuf::TextFormat::PrintToString(msg, &s);
+    if (!d_snapshot || msg.snapshot_id() != d_snapshot->id()) {
+      d_snapshot = std::make_shared<Snapshot>(d_channels.size(), msg.snapshot_id(),
+                                              d_money.load(std::memory_order_acquire));
+      std::vector<std::string> v;
+      v.reserve(d_channels.size());
+      for (auto e : d_channels) {
+        v.push_back(e.first);
+      }
+      d_snapshot->initialize(v);
+      BranchMessage bm;
+      bm.mutable_marker()->set_snapshot_id(msg.snapshot_id());
+      for (auto & [ name, ch ] : d_channels) {
+        ch->send_branch_msg(bm);
+      }
+    }
     d_snapshot->marker(ci.first);
-  }
+  });
 }
 
 void Branch::retrieve_snapshot_handler(const RetrieveSnapshot &msg, const channel_info &ci) {
-  // std::string s;
-  // google::protobuf::TextFormat::PrintToString(msg, &s);
-  // std::cout << s << '\n';
-  BranchMessage bm;
-  bm.mutable_return_snapshot()->CopyFrom(d_snapshot.value().to_message());
-  ci.second->send_branch_msg(bm);
+  if (msg.snapshot_id() == d_snapshot->id()) {
+    BranchMessage bm;
+    bm.mutable_return_snapshot()->CopyFrom(d_snapshot->to_message());
+    bm.mutable_return_snapshot()->set_name(c_name);
+    ci.second->send_branch_msg(bm);
+  } else {
+    std::cerr << "Someone requested a nonexistent snapshot" << std::endl;
+  }
 }
 
-void Branch::return_snapshot_handler(const ReturnSnapshot &msg, const channel_info &) {
-  // std::string s;
-  // google::protobuf::TextFormat::PrintToString(msg, &s);
-  // std::cout << s << '\n';
-}
+void Branch::return_snapshot_handler(const ReturnSnapshot &, const channel_info &) {}
 
 void Branch::transfer_handler(const Transfer &msg, const channel_info &ci) {
-  // std::cout << "incoming: " << ci.first << " " << msg.money() << std::endl;
   d_money += msg.money();
   if (d_snapshot) {
-    d_snapshot.value().record_tx(ci.first, msg.money());
+    d_snapshot->record_tx(ci.first, msg.money());
   }
 }
 
@@ -226,7 +200,6 @@ void Branch::hello_handler(const Hello &msg, const channel_info &ci) {
 }
 
 void Branch::message_handler(const BranchMessage &msg, const channel_info &ci) {
-  // std::cout << d_money << std::endl;
   using MsgTypes = BranchMessage::BranchMessageCase;
   MsgTypes branch_msg = msg.branch_message_case();
   switch (branch_msg) {

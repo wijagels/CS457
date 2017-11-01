@@ -40,6 +40,7 @@ message ReturnSnapshot {
   }
 
   LocalSnapshot local_snapshot = 1;
+  string name = 2;
 }
 
 message Hello {
