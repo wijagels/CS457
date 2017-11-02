@@ -16,11 +16,10 @@ class Snapshot {
     explicit CompletedState(const RecordingState &rs);
     const uint64_t transferred;
   };
+  using peer_info = std::tuple<std::string, std::string, uint16_t>;
 
  public:
-  Snapshot(size_t n, uint64_t id, uint64_t balance);
-
-  void initialize(const std::vector<std::string> &peers);
+  Snapshot(size_t n, uint64_t id, uint64_t balance, const std::vector<peer_info> &peers);
 
   uint64_t id();
 

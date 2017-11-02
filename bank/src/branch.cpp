@@ -21,16 +21,13 @@ Branch::Branch(std::string name, const tcp::endpoint &endpoint, boost::asio::io_
       d_resolver{io_service},
       d_strand{io_service} {}
 
-void Branch::start() {
-  do_accept();
-  do_send_money();
-}
+void Branch::start() { do_accept(); }
 
 void Branch::do_send_money() {
   auto self = shared_from_this();
-  std::uniform_int_distribution<int> timer_dist(0, 5);
+  std::uniform_int_distribution<int> timer_dist{0, 5};
   d_timer.expires_from_now(std::chrono::milliseconds(timer_dist(d_gen)));
-  d_timer.async_wait([this, self](boost::system::error_code ec) {
+  d_timer.async_wait(d_strand.wrap([this, self](boost::system::error_code ec) {
     if (!ec && d_channels.size()) {
       std::uniform_int_distribution<size_t> chan_dist{0, d_channels.size() - 1};
       size_t i = chan_dist(d_gen);
@@ -41,8 +38,8 @@ void Branch::do_send_money() {
           uint64_t curr_money = d_money.load(std::memory_order_relaxed);
           uint64_t to_send = 0;
           for (;;) {
-            std::uniform_int_distribution<uint64_t> subtr_dist(0.01 * curr_money,
-                                                               0.05 * curr_money);
+            std::uniform_int_distribution<uint64_t> subtr_dist{
+                static_cast<uint64_t>(0.01 * curr_money), static_cast<uint64_t>(0.05 * curr_money)};
             to_send = subtr_dist(d_gen);
             uint64_t end_bal = curr_money - to_send;
             if (to_send == 0) break;
@@ -61,7 +58,7 @@ void Branch::do_send_money() {
     }
     if (ec) std::cerr << ec.message() << std::endl;
     do_send_money();
-  });
+  }));
 }
 
 void Branch::do_accept() {
@@ -85,8 +82,6 @@ void Branch::init_branch_handler(const InitBranch &msg, const channel_info &) {
   d_money = msg.balance();
 
   const size_t num = msg.all_branches_size();
-  const size_t outgoing = ((num - 1) / 2);
-
   d_known_peers.reserve(num);
 
   for (size_t i = 0; i < num; i++) {
@@ -98,7 +93,10 @@ void Branch::init_branch_handler(const InitBranch &msg, const channel_info &) {
   if (iter == d_known_peers.end()) {
     throw std::runtime_error{"Init branch message does not include me!"};
   }
+
   const size_t offset = (iter - d_known_peers.begin());
+  const size_t outgoing = static_cast<size_t>((num - 1) / 2) +
+                          static_cast<size_t>((num % 2 == 0) ? (offset < (num / 2)) : 0);
   for (size_t i = offset + 1; i < offset + outgoing + 1; i++) {
     const auto & [ name, ip, port ] = d_known_peers.at(i % d_known_peers.size());
     auto ch = std::make_shared<Channel>(
@@ -111,17 +109,19 @@ void Branch::init_branch_handler(const InitBranch &msg, const channel_info &) {
     d_resolver.async_resolve(query, [ this, name = name, ch, self ](boost::system::error_code ec,
                                                                     tcp::resolver::iterator peers) {
       if (!ec) {
-        ch->connect_cb(peers, [this, name, ch, self]() {
+        ch->connect_cb(peers, d_strand.wrap([this, name, ch, self]() {
           d_channels.emplace(name, ch);
           BranchMessage bm;
           bm.mutable_hello()->set_name(c_name);
           ch->send_branch_msg(bm);
-        });
+        }));
       } else {
         throw std::runtime_error{"Unable to resolve peer: " + ec.message()};
       }
     });
   }
+  d_known_peers.erase(iter);
+  do_send_money();
 }
 
 void Branch::init_snapshot_handler(const InitSnapshot &msg, const channel_info &) {
@@ -130,13 +130,7 @@ void Branch::init_snapshot_handler(const InitSnapshot &msg, const channel_info &
     auto n = d_channels.size();
     auto id = msg.snapshot_id();
     auto bal = d_money.load(std::memory_order_relaxed);
-    d_snapshot = std::make_shared<Snapshot>(n, id, bal);
-    std::vector<std::string> v;
-    v.reserve(d_channels.size());
-    for (auto e : d_channels) {
-      v.push_back(e.first);
-    }
-    d_snapshot->initialize(v);
+    d_snapshot = std::make_shared<Snapshot>(n, id, bal, d_known_peers);
 
     BranchMessage bm;
     bm.mutable_marker()->set_snapshot_id(id);
@@ -152,14 +146,8 @@ void Branch::marker_handler(const Marker &msg, const channel_info &ci) {
     std::string s;
     google::protobuf::TextFormat::PrintToString(msg, &s);
     if (!d_snapshot || msg.snapshot_id() != d_snapshot->id()) {
-      d_snapshot = std::make_shared<Snapshot>(d_channels.size(), msg.snapshot_id(),
-                                              d_money.load(std::memory_order_acquire));
-      std::vector<std::string> v;
-      v.reserve(d_channels.size());
-      for (auto e : d_channels) {
-        v.push_back(e.first);
-      }
-      d_snapshot->initialize(v);
+      d_snapshot =
+          std::make_shared<Snapshot>(d_channels.size(), msg.snapshot_id(), d_money, d_known_peers);
       BranchMessage bm;
       bm.mutable_marker()->set_snapshot_id(msg.snapshot_id());
       for (auto & [ name, ch ] : d_channels) {
@@ -192,11 +180,13 @@ void Branch::transfer_handler(const Transfer &msg, const channel_info &ci) {
 
 void Branch::hello_handler(const Hello &msg, const channel_info &ci) {
   auto self = shared_from_this();
-  auto it = std::remove(std::begin(d_pending_peers), std::end(d_pending_peers), ci.second);
-  d_pending_peers.erase(it, std::end(d_pending_peers));
-  std::pair p{msg.name(), ci.second};
-  ci.second->handler() = [this, self, p](const BranchMessage &m) { message_handler(m, p); };
-  d_channels.emplace(msg.name(), ci.second);
+  d_strand.post([this, msg, ci, self]() {
+    auto it = std::remove(std::begin(d_pending_peers), std::end(d_pending_peers), ci.second);
+    d_pending_peers.erase(it, std::end(d_pending_peers));
+    std::pair p{msg.name(), ci.second};
+    ci.second->handler() = [this, self, p](const BranchMessage &m) { message_handler(m, p); };
+    d_channels.emplace(msg.name(), ci.second);
+  });
 }
 
 void Branch::message_handler(const BranchMessage &msg, const channel_info &ci) {

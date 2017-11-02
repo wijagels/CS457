@@ -1,6 +1,6 @@
 #include "controller.hpp"
-#include <memory>
 #include <boost/asio.hpp>
+#include <memory>
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -9,5 +9,10 @@ int main(int argc, char **argv) {
   boost::asio::io_service io_service;
   auto controller = std::make_shared<Controller>(std::stoull(argv[1]), io_service);
   controller->start(argv[2]);
-  io_service.run();
+  try {
+    io_service.run();
+  } catch (const std::runtime_error &ex) {
+    std::cerr << ex.what() << std::endl;
+    std::exit(0);
+  }
 }

@@ -1,28 +1,45 @@
 #include "snapshot.hpp"
+#include <mutex>
+#include <string>
+#include <vector>
+
+std::mutex mtx;
 
 Snapshot::CompletedState::CompletedState(const RecordingState &rs) : transferred{rs.transferred} {}
 
-Snapshot::Snapshot(size_t n, uint64_t id, uint64_t balance)
-    : d_states{n}, c_id{id}, c_balance{balance} {}
-
-void Snapshot::initialize(const std::vector<std::string> &peers) {
+Snapshot::Snapshot(size_t n, uint64_t id, uint64_t balance, const std::vector<peer_info> &peers)
+    : d_states{n}, c_id{id}, c_balance{balance} {
   for (const auto &e : peers) {
-    d_states.emplace(e, RecordingState{});
+    d_states.emplace(std::get<0>(e), RecordingState{});
   }
 }
 
 uint64_t Snapshot::id() { return c_id; }
 
 void Snapshot::record_tx(const std::string &from, uint64_t amount) {
-  auto &s = d_states.at(from);
-  if (std::holds_alternative<RecordingState>(s)) {
-    std::get<RecordingState>(s).transferred += amount;
-  }  // else no-op
+  try {
+    auto &s = d_states.at(from);
+    if (std::holds_alternative<RecordingState>(s)) {
+      std::get<RecordingState>(s).transferred += amount;
+    }  // else no-op
+  } catch (std::out_of_range) {
+    std::cerr << from << std::endl;
+  } catch (std::bad_variant_access) {
+    std::cerr << from << std::endl;
+    std::cerr << d_states.at(from).index() << std::endl;
+  }
 }
 
 void Snapshot::marker(const std::string &from) {
-  auto &s = d_states.at(from);
-  s.emplace<CompletedState>(std::get<RecordingState>(s));
+  try {
+    auto &s = d_states.at(from);
+    s.emplace<CompletedState>(std::get<RecordingState>(s));
+  } catch (std::out_of_range) {
+    std::cerr << from << std::endl;
+  } catch (std::bad_variant_access) {
+    std::cerr << from << std::endl;
+    std::cerr << d_states.at(from).index() << std::endl;
+  }
 }
 
 ReturnSnapshot Snapshot::to_message() {
