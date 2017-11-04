@@ -9,7 +9,7 @@
 
 class Channel : public std::enable_shared_from_this<Channel> {
  public:
-  Channel(boost::asio::ip::tcp::socket socket, boost::asio::io_service &io_service,
+  Channel(boost::asio::ip::tcp::socket &&socket, boost::asio::io_service &io_service,
           std::function<void(const BranchMessage &)> msg_handler);
 
   Channel(boost::asio::io_service &io_service,

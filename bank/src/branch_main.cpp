@@ -12,20 +12,20 @@ int main(int argc, char *argv[]) {
   boost::asio::io_service io_service;
   std::shared_ptr<Branch> branch = std::make_shared<Branch>(name, endpoint, io_service);
   branch->start();
-  auto worker = [&io_service]() {
-    try {
+  // auto worker = [&io_service]() {
+  //   try {
       io_service.run();
-    } catch (const std::runtime_error &ex) {
-      std::cerr << ex.what() << std::endl;
-      std::exit(0);
-    }
-  };
-  std::thread t1{worker};
-  std::thread t2{worker};
-  std::thread t3{worker};
-  std::thread t4{worker};
-  t1.join();
-  t2.join();
-  t3.join();
-  t4.join();
+    // } catch (const std::runtime_error &ex) {
+    //   std::cerr << ex.what() << std::endl;
+    //   std::exit(0);
+    // }
+  // };
+  // std::thread t1{worker};
+  // std::thread t2{worker};
+  // std::thread t3{worker};
+  // std::thread t4{worker};
+  // t1.join();
+  // t2.join();
+  // t3.join();
+  // t4.join();
 }

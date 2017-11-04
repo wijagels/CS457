@@ -33,8 +33,6 @@ class Branch : public std::enable_shared_from_this<Branch> {
 
   void do_accept();
 
-  // void match_peers();
-
   void init_branch_handler(const InitBranch &msg, const channel_info &ci);
 
   void init_snapshot_handler(const InitSnapshot &msg, const channel_info &ci);

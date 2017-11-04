@@ -4,7 +4,7 @@
 #include "proto/bank.pb.h"
 #include <memory>
 
-Channel::Channel(boost::asio::ip::tcp::socket socket, boost::asio::io_service &io_service,
+Channel::Channel(boost::asio::ip::tcp::socket &&socket, boost::asio::io_service &io_service,
                  std::function<void(const BranchMessage &)> msg_handler)
     : d_socket{std::move(socket)}, d_msg_handler{std::move(msg_handler)}, d_strand{io_service} {}
 

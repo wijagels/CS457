@@ -23,8 +23,9 @@ void Snapshot::record_tx(const std::string &from, uint64_t amount) {
       std::get<RecordingState>(s).transferred += amount;
     }  // else no-op
   } catch (std::out_of_range) {
-    std::cerr << from << std::endl;
+    std::cerr << "Tx " << from << std::endl;
   } catch (std::bad_variant_access) {
+    std::cerr << "Tx " << from << std::endl;
     std::cerr << from << std::endl;
     std::cerr << d_states.at(from).index() << std::endl;
   }
@@ -35,8 +36,9 @@ void Snapshot::marker(const std::string &from) {
     auto &s = d_states.at(from);
     s.emplace<CompletedState>(std::get<RecordingState>(s));
   } catch (std::out_of_range) {
-    std::cerr << from << std::endl;
+    std::cerr << "Marker " << from << std::endl;
   } catch (std::bad_variant_access) {
+    std::cerr << "Marker " << from << std::endl;
     std::cerr << from << std::endl;
     std::cerr << d_states.at(from).index() << std::endl;
   }

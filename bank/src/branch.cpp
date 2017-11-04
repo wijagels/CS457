@@ -103,7 +103,6 @@ void Branch::init_branch_handler(const InitBranch &msg, const channel_info &) {
         d_io_service, [this, self](const BranchMessage &m) { message_handler(m, {}); });
     std::pair p{name, ch};
     ch->handler() = [this, self, p](const BranchMessage &m) { message_handler(m, p); };
-    tcp::endpoint peer{boost::asio::ip::address::from_string(ip), static_cast<uint16_t>(port)};
     tcp::resolver::query query{tcp::v4(), ip, std::to_string(static_cast<uint32_t>(port)),
                                tcp::resolver::query::numeric_service};
     d_resolver.async_resolve(query, [ this, name = name, ch, self ](boost::system::error_code ec,
@@ -159,14 +158,17 @@ void Branch::marker_handler(const Marker &msg, const channel_info &ci) {
 }
 
 void Branch::retrieve_snapshot_handler(const RetrieveSnapshot &msg, const channel_info &ci) {
-  if (msg.snapshot_id() == d_snapshot->id()) {
-    BranchMessage bm;
-    bm.mutable_return_snapshot()->CopyFrom(d_snapshot->to_message());
-    bm.mutable_return_snapshot()->set_name(c_name);
-    ci.second->send_branch_msg(bm);
-  } else {
-    std::cerr << "Someone requested a nonexistent snapshot" << std::endl;
-  }
+  auto self = shared_from_this();
+  d_strand.post([this, msg, ci, self]() {
+    if (msg.snapshot_id() == d_snapshot->id()) {
+      BranchMessage bm;
+      bm.mutable_return_snapshot()->CopyFrom(d_snapshot->to_message());
+      bm.mutable_return_snapshot()->set_name(c_name);
+      ci.second->send_branch_msg(bm);
+    } else {
+      std::cerr << "Someone requested a nonexistent snapshot" << std::endl;
+    }
+  });
 }
 
 void Branch::return_snapshot_handler(const ReturnSnapshot &, const channel_info &) {}

@@ -34,7 +34,7 @@ void Controller::do_read_list(const std::string_view &filename) {
     if (!file_stream.is_open()) {
       throw std::invalid_argument{"Can't open branches file"};
     }
-    std::regex line_re{R"((\S+)\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+(\d+))"};
+    std::regex line_re{R"((\S+)\s+(\S+)\s+(\d+))"};
     std::smatch match;
     for (std::string line; std::getline(file_stream, line);) {
       if (!std::regex_match(line, match, line_re) || match.size() != 4) {
