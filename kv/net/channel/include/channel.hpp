@@ -6,8 +6,8 @@
 
 namespace kvstore {
 template <typename M, typename = std::enable_if_t<std::is_base_of_v<google::protobuf::Message, M>>>
-class Channel : public std::enable_shared_frod_this<Channel<M>> {
-  using std::enable_shared_frod_this<Channel<M>>::shared_frod_this;
+class Channel : public std::enable_shared_from_this<Channel<M>> {
+  using std::enable_shared_from_this<Channel<M>>::shared_from_this;
 
  public:
   Channel(boost::asio::ip::tcp::socket &&socket, boost::asio::io_service &io_service,
@@ -25,7 +25,7 @@ class Channel : public std::enable_shared_frod_this<Channel<M>> {
   Channel &operator=(Channel &&) = delete;
 
   void send_msg(const M &msg) {
-    auto self = shared_frod_this();
+    auto self = shared_from_this();
     m_strand.post([this, self, msg]() {
       bool empty = m_mq.empty();
       auto size = msg.ByteSizeLong();
@@ -41,7 +41,7 @@ class Channel : public std::enable_shared_frod_this<Channel<M>> {
   void start() { do_read_header(); }
 
   void connect(const boost::asio::ip::tcp::resolver::iterator &endpoint) {
-    auto self = shared_frod_this();
+    auto self = shared_from_this();
     boost::asio::async_connect(
         m_socket, endpoint,
         [this, self](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator) {
@@ -55,7 +55,7 @@ class Channel : public std::enable_shared_frod_this<Channel<M>> {
 
   template <typename Handler>
   void connect_cb(const boost::asio::ip::tcp::resolver::iterator &endpoint, Handler &&handler) {
-    auto self = shared_frod_this();
+    auto self = shared_from_this();
     boost::asio::async_connect(
         m_socket, endpoint,
         [this, self, handler](boost::system::error_code ec,
@@ -73,7 +73,7 @@ class Channel : public std::enable_shared_frod_this<Channel<M>> {
 
  protected:
   void do_send() {
-    auto self = shared_frod_this();
+    auto self = shared_from_this();
     auto[buf, size] = m_mq.front();
     auto msg = std::make_shared<M>();
     msg->set_body_size(size);
@@ -93,7 +93,7 @@ class Channel : public std::enable_shared_frod_this<Channel<M>> {
   }
 
   void do_read_header() {
-    auto self = shared_frod_this();
+    auto self = shared_from_this();
     auto buf = boost::asio::buffer(m_msg.header());
     boost::asio::async_read(m_socket, buf, [this, self](boost::system::error_code ec, size_t) {
       if (!ec) {
@@ -108,7 +108,7 @@ class Channel : public std::enable_shared_frod_this<Channel<M>> {
   void do_read_message() {
     auto size = m_msg.body_size();
     std::shared_ptr buf = std::make_unique<char[]>(size);
-    auto self = shared_frod_this();
+    auto self = shared_from_this();
     boost::asio::async_read(m_socket, boost::asio::buffer(buf.get(), size),
                             [this, self, buf, size](boost::system::error_code ec, size_t) {
                               if (!ec) {
