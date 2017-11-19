@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package kvstore.server;
+
+option cc_enable_arenas = true;
+
+import "google/protobuf/timestamp.proto";
+
+message DoWrite {
+  string uuid = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  uint32 key = 3;
+  string val = 4;
+}
+
+message WriteComplete {
+  string uuid = 1;
+}
+
+message DoRead {
+  string uuid = 1;
+  uint32 key = 2;
+}
+
+message ReadComplete {
+  string uuid = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string val = 3;
+}
+
+message ServerMessage {
+  oneof msg {
+    DoWrite do_write = 1;
+    WriteComplete write_complete = 2;
+    DoRead do_read = 3;
+    ReadComplete read_complete = 4;
+  }
+}
