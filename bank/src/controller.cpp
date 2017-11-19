@@ -53,6 +53,7 @@ void Controller::do_read_list(const std::string_view &filename) {
 void Controller::do_init_branches() {
   auto self = shared_from_this();
   using boost::asio::ip::tcp;
+  d_msg.set_balance(d_msg.balance() / d_peers.size());  // Evenly distribute
   for (const auto & [ name, ip, port ] : d_peers) {
     auto ch = std::make_shared<Channel>(
         d_io_service, [this, self](const BranchMessage &msg) { this->handle_message(msg); });
