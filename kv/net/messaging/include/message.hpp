@@ -1,13 +1,12 @@
 #pragma once
 #include <cstring>
-#include <google/protobuf/message.h>
 #include <type_traits>
+#include <array>
 extern "C" {
 #include <endian.h>
 }
 
 namespace kvstore::messaging {
-template <typename M, typename = std::enable_if_t<std::is_base_of_v<google::protobuf::Message, M>>>
 class Message {
  public:
   Message() = default;

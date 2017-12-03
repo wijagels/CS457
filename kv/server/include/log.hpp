@@ -33,7 +33,7 @@ class Log : public std::enable_shared_from_this<Log> {
   void write_update(const ServerMessage &msg, Handler &&handler) {
     auto self = shared_from_this();
     m_strand.post([this, self, msg, handler]() {
-      messaging::Message<ServerMessage> encoded;
+      messaging::Message encoded;
       encoded.set_body_size(msg.ByteSizeLong());
       m_file.write(reinterpret_cast<char *>(encoded.header().data()), encoded.header_length);
       msg.SerializeToOstream(&m_file);
@@ -47,7 +47,7 @@ class Log : public std::enable_shared_from_this<Log> {
     auto self = shared_from_this();
     m_strand.post([this, self, handler]() {
       auto file = std::ifstream{m_file_path, std::ios::in | std::ios::binary};
-      messaging::Message<ServerMessage> msg;
+      messaging::Message msg;
       auto read_buf = reinterpret_cast<char *>(msg.header().data());
       std::size_t alloc_size = 32;
       auto temp_buf = std::make_unique<char[]>(alloc_size);

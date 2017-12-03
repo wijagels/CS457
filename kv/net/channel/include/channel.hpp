@@ -2,7 +2,7 @@
 #include "message.hpp"
 #include <boost/asio.hpp>
 #include <deque>
-#include <google/protobuf/message.hpp>
+#include <google/protobuf/message.h>
 
 namespace kvstore {
 template <typename M, typename = std::enable_if_t<std::is_base_of_v<google::protobuf::Message, M>>>
@@ -69,16 +69,16 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
         });
   }
 
-  std::function<void(const M &)> &handler() noexcept { return m_msg_handler; }
+  auto &handler() noexcept { return m_msg_handler; }
 
  protected:
   void do_send() {
     auto self = shared_from_this();
     auto[buf, size] = m_mq.front();
-    auto msg = std::make_shared<M>();
-    msg->set_body_size(size);
+    messaging::Message msg;
+    msg.set_body_size(size);
     std::array<boost::asio::const_buffer, 2> buf_seq{
-        {boost::asio::buffer(msg->header()), boost::asio::const_buffer{buf.get(), size}}};
+        {boost::asio::buffer(msg.header()), boost::asio::const_buffer{buf.get(), size}}};
     auto handler = m_strand.wrap([this, self, msg](boost::system::error_code ec, size_t) {
       if (!ec) {
         m_mq.pop_front();
@@ -125,8 +125,8 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
  private:
   boost::asio::ip::tcp::socket m_socket;
   std::deque<std::pair<std::shared_ptr<char[]>, size_t>> m_mq;
-  messaging::Message<M> m_msg;
+  messaging::Message m_msg;
   boost::asio::strand m_strand;
-  std::function<void(const M &)> m_msg_handler;
+  std::function<void(const M &, std::shared_ptr<Channel>)> m_msg_handler;
 };
 }  // namespace kvstore

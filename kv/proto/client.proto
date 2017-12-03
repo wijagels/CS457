@@ -5,23 +5,33 @@ package kvstore.client;
 option cc_enable_arenas = true;
 
 message GetKey {
-  uint32 key = 1;
+  uint32 stream = 1;
+  uint32 key = 2;
+  uint32 consistency = 3;
 }
 
 message GetKeyResp {
   uint32 stream = 1;
-  string val = 2;
+  uint32 key = 2;
+  string val = 3;
 }
 
 message PutKey {
-  uint32 key = 1;
-  string val = 2;
-  uint32 consistency = 3;
+  uint32 stream = 1;
+  uint32 key = 2;
+  string val = 3;
+  uint32 consistency = 4;
+}
+
+message PutKeyResp {
+  uint32 stream = 1;
+  uint32 key = 2;
 }
 
 message ClientMessage {
   oneof msg {
     GetKey get_key = 1;
-    PutKey put_key = 2;
+    GetKeyResp get_key_resp = 2;
+    PutKey put_key = 3;
   }
 }

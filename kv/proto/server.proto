@@ -8,8 +8,8 @@ import "google/protobuf/timestamp.proto";
 
 message DoWrite {
   string uuid = 1;
-  google.protobuf.Timestamp timestamp = 2;
-  uint32 key = 3;
+  uint32 key = 2;
+  google.protobuf.Timestamp timestamp = 3;
   string val = 4;
 }
 
@@ -28,11 +28,23 @@ message ReadComplete {
   string val = 3;
 }
 
+message ReadRepair {
+  uint32 key = 1;
+}
+
+message ReadRepairResponse {
+  uint32 key = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string val = 3;
+}
+
 message ServerMessage {
   oneof msg {
     DoWrite do_write = 1;
     WriteComplete write_complete = 2;
     DoRead do_read = 3;
     ReadComplete read_complete = 4;
+    ReadRepair read_repair = 5;
+    ReadRepairResponse read_repair_response = 6;
   }
 }

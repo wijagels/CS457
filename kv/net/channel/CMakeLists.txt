@@ -1,4 +1,5 @@
 find_package(Protobuf REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
 
 add_library(Channel INTERFACE)
 add_library(KVStore::Channel ALIAS Channel)
