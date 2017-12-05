@@ -2,6 +2,7 @@
 #include "channel.hpp"
 #include "client.pb.h"
 #include "config.hpp"
+#include "hint.pb.h"
 #include "replica.hpp"
 #include "server.pb.h"
 #include <boost/asio.hpp>
@@ -12,17 +13,6 @@
 
 namespace kvstore::server {
 class Coordinator : public std::enable_shared_from_this<Coordinator> {
- public:
-  Coordinator(boost::asio::io_service &io_service, Config cfg);
-  void do_read(const DoRead &msg);
-
- protected:
-  void handle_read_repair_response(const ReadRepairResponse &msg,
-                                   std::shared_ptr<Channel<ServerMessage>> from);
-
-  void handle_get(const client::GetKey &msg, std::shared_ptr<Channel<client::ClientMessage>> from);
-
- private:
   struct pending_read {
     pending_read(uint32_t astream, uint32_t akey, uint32_t aconsistency,
                  std::shared_ptr<Channel<client::ClientMessage>> arequestor,
@@ -47,16 +37,39 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
     uint32_t consistency;
     std::shared_ptr<Channel<client::ClientMessage>> requestor;
   };
+  struct hint {
+    uint32_t key;
+    ::google::protobuf::Timestamp timestamp;
+  };
+
+ public:
+  Coordinator(boost::asio::io_service &io_service, Config cfg);
+  void do_read(const DoRead &msg);
+
+ protected:
+  void handle_read_repair_response(const ReadRepairResponse &msg,
+                                   const std::shared_ptr<Channel<ServerMessage>> &from);
+
+  void handle_get(const client::GetKey &msg,
+                  const std::shared_ptr<Channel<client::ClientMessage>> &from);
+
+  void handle_put(const client::PutKey &msg,
+                  const std::shared_ptr<Channel<client::ClientMessage>> &from);
+
+ private:
   boost::asio::io_service &m_io_service;
   Config m_config;
-  Replica m_replica;
+  std::shared_ptr<Replica> m_replica;
   std::vector<std::shared_ptr<Channel<ServerMessage>>> m_channels;
+  Log<HintMessage> m_hint_log{m_config.hint_log(), m_io_service};
 
   std::unordered_map<std::string, pending_read> m_pending_reads;
   boost::asio::strand m_pending_read_strand{m_io_service};
 
   std::unordered_map<std::string, pending_write> m_pending_writes;
   boost::asio::strand m_pending_write_strand{m_io_service};
+
+  std::vector<std::array<std::atomic_int_fast32_t, 256>> m_hints;
 
   boost::uuids::random_generator m_uuid_gen{};
 };

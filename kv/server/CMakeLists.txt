@@ -9,7 +9,7 @@ add_library(KVStore::Server ALIAS server)
 
 target_include_directories(server PUBLIC include)
 
-target_link_libraries(server PUBLIC Boost::boost Boost::system KVStore::server-proto KVStore::Messaging KVStore::Channel stdc++fs.a PkgConfig::Jsoncpp)
+target_link_libraries(server PUBLIC Boost::boost Boost::system KVStore::server-proto KVStore::client-proto KVStore::hint-proto KVStore::Messaging KVStore::Channel stdc++fs.a PkgConfig::Jsoncpp)
 
 # set_target_properties(server PROPERTIES CXX_CLANG_TIDY clang-tidy)
 

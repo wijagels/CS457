@@ -2,10 +2,11 @@
 #include <gtest/gtest.h>
 
 using kvstore::server::Log;
+using kvstore::server::ServerMessage;
 
 TEST(Log, single_write) {  // NOLINT
   boost::asio::io_service svc;
-  auto log = std::make_shared<Log>("testing.log", svc);
+  auto log = std::make_shared<Log<ServerMessage>>("testing.log", svc);
   log->clear();
   kvstore::server::ServerMessage msg;
   msg.mutable_do_write()->set_uuid("Hello world");
@@ -21,7 +22,7 @@ TEST(Log, single_write) {  // NOLINT
 
 TEST(Log, multi_write) {  // NOLINT
   boost::asio::io_service svc;
-  auto log = std::make_shared<Log>("testing.log", svc);
+  auto log = std::make_shared<Log<ServerMessage>>("testing.log", svc);
   log->clear();
   auto runs = 0;
   kvstore::server::ServerMessage msg2;

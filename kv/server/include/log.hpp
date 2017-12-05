@@ -16,21 +16,31 @@ namespace stdfs = std::filesystem;
 namespace stdfs = std::experimental::filesystem;
 #endif
 
-class Log : public std::enable_shared_from_this<Log> {
+template <typename M>
+class Log : public std::enable_shared_from_this<Log<M>> {
+  using std::enable_shared_from_this<Log<M>>::shared_from_this;
+
  public:
-  Log(stdfs::path file_path, boost::asio::io_service &io_service);
+  Log(stdfs::path file_path, boost::asio::io_service &io_service)
+      : m_file_path{std::move(file_path)},
+        m_file{m_file_path, std::ios::out | std::ios::binary | std::ios::ate | std::ios::app},
+        m_io_service{io_service},
+        m_strand{m_io_service} {}
 
   /**
    * Clears the contents of the log
    */
-  void clear();
+  void clear() {
+    m_file.close();
+    m_file.open(m_file_path, std::ios::out | std::ios::binary | std::ios::ate | std::ios::trunc);
+  }
 
   /**
    * Asynchronously update the log with a server message.
    * Flushes before calling the completion handler.
    */
   template <typename Handler>
-  void write_update(const ServerMessage &msg, Handler &&handler) {
+  void write_update(const M &msg, Handler &&handler) {
     auto self = shared_from_this();
     m_strand.post([this, self, msg, handler]() {
       messaging::Message encoded;
@@ -60,9 +70,9 @@ class Log : public std::enable_shared_from_this<Log> {
           temp_buf = std::make_unique<char[]>(alloc_size);
         }
         file.read(temp_buf.get(), msg.body_size());
-        ServerMessage sm;
-        sm.ParseFromArray(temp_buf.get(), msg.body_size());
-        handler(std::move(sm));
+        M message;
+        message.ParseFromArray(temp_buf.get(), msg.body_size());
+        handler(std::move(message));
       }
     });
   }
