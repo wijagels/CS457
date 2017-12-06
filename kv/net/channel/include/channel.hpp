@@ -11,11 +11,20 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
 
  public:
   Channel(boost::asio::ip::tcp::socket &&socket, boost::asio::io_service &io_service,
-          std::function<void(const M &)> msg_handler)
-      : m_socket{std::move(socket)}, m_strand{io_service}, m_msg_handler{std::move(msg_handler)} {}
+          std::function<void(const M &, const std::shared_ptr<Channel<M>> &)> msg_handler)
+      : m_io_service{io_service},
+        m_socket{std::move(socket)},
+        m_strand{m_io_service},
+        m_msg_handler{std::move(msg_handler)},
+        m_active{false} {}
 
-  Channel(boost::asio::io_service &io_service, std::function<void(const M &)> msg_handler)
-      : m_socket{io_service}, m_strand{io_service}, m_msg_handler{std::move(msg_handler)} {}
+  Channel(boost::asio::io_service &io_service,
+          std::function<void(const M &, const std::shared_ptr<Channel<M>> &)> msg_handler)
+      : m_io_service{io_service},
+        m_socket{m_io_service},
+        m_strand{m_io_service},
+        m_msg_handler{std::move(msg_handler)},
+        m_active{true} {}
 
   ~Channel() = default;
 
@@ -42,13 +51,15 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
 
   void connect(const boost::asio::ip::tcp::resolver::iterator &endpoint) {
     auto self = shared_from_this();
+    m_peer = endpoint;
     boost::asio::async_connect(
         m_socket, endpoint,
         [this, self](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator) {
           if (!ec) {
             start();
           } else {
-            throw std::runtime_error{"Unable to connect to peer: " + ec.message()};
+            std::cerr << "Unable to connect to peer: " + ec.message() << '\n';
+            reconnect();
           }
         });
   }
@@ -56,22 +67,38 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
   template <typename Handler>
   void connect_cb(const boost::asio::ip::tcp::resolver::iterator &endpoint, Handler &&handler) {
     auto self = shared_from_this();
-    boost::asio::async_connect(
-        m_socket, endpoint,
-        [this, self, handler](boost::system::error_code ec,
-                              boost::asio::ip::tcp::resolver::iterator) {
-          if (!ec) {
-            m_socket.get_io_service().post(handler);
-            start();
-          } else {
-            throw std::runtime_error{"Unable to connect to peer: " + ec.message()};
-          }
-        });
+    m_peer = endpoint;
+    boost::asio::async_connect(m_socket, endpoint,
+                               [this, self, handler](boost::system::error_code ec,
+                                                     boost::asio::ip::tcp::resolver::iterator) {
+                                 if (!ec) {
+                                   m_socket.get_io_service().post(handler);
+                                   start();
+                                 } else {
+                                   std::cerr << "Unable to connect to peer: " + ec.message()
+                                             << '\n';
+                                   reconnect();
+                                 }
+                               });
   }
 
   auto &handler() noexcept { return m_msg_handler; }
 
  protected:
+  void reconnect() {
+    if (!m_active) return;
+    auto self = shared_from_this();
+    boost::asio::deadline_timer timer(m_io_service);
+    timer.expires_from_now(boost::posix_time::seconds(5));
+    auto handler = m_strand.wrap([this, self](boost::system::error_code ec) {
+      if (!ec) {
+        m_mq.clear();
+        connect(m_peer);
+      }
+    });
+    timer.async_wait(handler);
+  }
+
   void do_send() {
     auto self = shared_from_this();
     auto[buf, size] = m_mq.front();
@@ -79,14 +106,15 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
     msg.set_body_size(size);
     std::array<boost::asio::const_buffer, 2> buf_seq{
         {boost::asio::buffer(msg.header()), boost::asio::const_buffer{buf.get(), size}}};
-    auto handler = m_strand.wrap([this, self, msg](boost::system::error_code ec, size_t) {
+    auto handler = m_strand.wrap([this, self](boost::system::error_code ec, size_t) {
       if (!ec) {
         m_mq.pop_front();
         if (!m_mq.empty()) {
           do_send();
         }
       } else {
-        throw std::runtime_error{"Sending failed: " + ec.message()};
+        std::cerr << "Sending failed: " + ec.message() << '\n';
+        reconnect();
       }
     });
     boost::asio::async_write(m_socket, std::move(buf_seq), std::move(handler));
@@ -100,7 +128,8 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
         m_msg.decode_header();
         do_read_message();
       } else {
-        throw std::runtime_error{"Reading header failed: " + ec.message()};
+        std::cerr << "Reading header failed: " + ec.message() << '\n';
+        reconnect();
       }
     });
   }
@@ -114,19 +143,23 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
                               if (!ec) {
                                 M msg;
                                 msg.ParseFromArray(buf.get(), size);
-                                m_msg_handler(msg);
+                                m_msg_handler(msg, self);
                                 do_read_header();
                               } else {
-                                throw std::runtime_error{"Reading message failed: " + ec.message()};
+                                std::cerr << "Reading message failed: " + ec.message() << '\n';
+                                reconnect();
                               }
                             });
   }
 
  private:
+  boost::asio::io_service &m_io_service;
   boost::asio::ip::tcp::socket m_socket;
   std::deque<std::pair<std::shared_ptr<char[]>, size_t>> m_mq;
   messaging::Message m_msg;
   boost::asio::strand m_strand;
-  std::function<void(const M &, std::shared_ptr<Channel>)> m_msg_handler;
+  std::function<void(const M &, const std::shared_ptr<Channel<M>> &)> m_msg_handler;
+  bool m_active;
+  boost::asio::ip::tcp::resolver::iterator m_peer;
 };
 }  // namespace kvstore

@@ -22,8 +22,8 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
           consistency{aconsistency},
           requestor{std::move(arequestor)},
           results{std::move(aresults)} {}
-    uint32_t stream;
-    uint32_t key;
+    const uint32_t stream;
+    const uint32_t key;
     uint32_t consistency;
     std::shared_ptr<Channel<client::ClientMessage>> requestor;
     std::vector<std::pair<::google::protobuf::Timestamp, std::string>> results;
@@ -32,10 +32,10 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
     pending_write(uint32_t astream, uint32_t akey, uint32_t aconsistency,
                   std::shared_ptr<Channel<client::ClientMessage>> arequestor)
         : stream{astream}, key{akey}, consistency{aconsistency}, requestor{std::move(arequestor)} {}
-    uint32_t stream;
-    uint32_t key;
+    const uint32_t stream;
+    const uint32_t key;
     uint32_t consistency;
-    std::shared_ptr<Channel<client::ClientMessage>> requestor;
+    const std::shared_ptr<Channel<client::ClientMessage>> requestor;
   };
   struct hint {
     uint32_t key;
@@ -44,17 +44,42 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
 
  public:
   Coordinator(boost::asio::io_service &io_service, Config cfg);
-  void do_read(const DoRead &msg);
+
+  void start();
 
  protected:
+  void do_accept();
+
   void handle_read_repair_response(const ReadRepairResponse &msg,
                                    const std::shared_ptr<Channel<ServerMessage>> &from);
+
+  void handle_read_repair(const ReadRepair &msg,
+                          const std::shared_ptr<Channel<ServerMessage>> &from);
 
   void handle_get(const client::GetKey &msg,
                   const std::shared_ptr<Channel<client::ClientMessage>> &from);
 
   void handle_put(const client::PutKey &msg,
                   const std::shared_ptr<Channel<client::ClientMessage>> &from);
+
+  void handle_write_complete(const WriteComplete &msg, uint32_t from);
+
+  void handle_do_write(const DoWrite &msg, const std::shared_ptr<Channel<ServerMessage>> &ptr,
+                       uint32_t from);
+
+  void handle_do_read(const DoRead &msg, const std::shared_ptr<Channel<ServerMessage>> &ptr,
+                      uint32_t from);
+
+  void handle_read_complete(const ReadComplete &msg,
+                            const std::shared_ptr<Channel<ServerMessage>> &ptr, uint32_t from);
+
+  void unintroduced_msg_handler(const ServerMessage &msg,
+                                const std::shared_ptr<Channel<ServerMessage>> &ptr);
+
+  void server_msg_handler(const ServerMessage &msg,
+                          const std::shared_ptr<Channel<ServerMessage>> &ptr, uint32_t id);
+
+  void initialize_outgoing();
 
  private:
   boost::asio::io_service &m_io_service;
@@ -72,5 +97,8 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
   std::vector<std::array<std::atomic_int_fast32_t, 256>> m_hints;
 
   boost::uuids::random_generator m_uuid_gen{};
+
+  boost::asio::ip::tcp::acceptor m_acceptor{m_io_service};
+  boost::asio::ip::tcp::socket m_socket{m_io_service};
 };
 }  // namespace kvstore::server

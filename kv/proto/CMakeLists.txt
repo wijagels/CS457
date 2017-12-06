@@ -20,6 +20,16 @@ target_include_directories(server-proto SYSTEM INTERFACE
     )
 add_library(KVStore::server-proto ALIAS server-proto)
 
+protobuf_generate_cpp(HINT_PROTO_SRCS HINT_PROTO_HDRS hint.proto)
+add_library(hint-proto ${HINT_PROTO_SRCS} ${HINT_PROTO_HDRS})
+target_compile_definitions(hint-proto PUBLIC PROTOBUF_INLINE_NOT_IN_HEADERS=0)
+target_link_libraries(hint-proto INTERFACE protobuf::libprotobuf)
+target_include_directories(hint-proto SYSTEM INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<INSTALL_INTERFACE:include>
+    )
+add_library(KVStore::hint-proto ALIAS hint-proto)
+
 # Who the hell knows if this even works
 install(TARGETS client-proto EXPORT client-proto-targets
     LIBRARY DESTINATION lib
@@ -51,4 +61,20 @@ install(EXPORT server-proto-targets
     FILE server-proto-targets.cmake
     NAMESPACE KVStore::
     DESTINATION lib/cmake/KVStore-server-proto
+    )
+
+install(TARGETS hint-proto EXPORT hint-proto-targets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+    )
+INSTALL(FILES
+    ${HINT_PROTO_HDRS}
+    DESTINATION include
+    )
+install(EXPORT hint-proto-targets
+    FILE hint-proto-targets.cmake
+    NAMESPACE KVStore::
+    DESTINATION lib/cmake/KVStore-hint-proto
     )

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package kvstore.client;
 
-option cc_enable_arenas = true;
-
 message GetKey {
   uint32 stream = 1;
   uint32 key = 2;
@@ -33,5 +31,6 @@ message ClientMessage {
     GetKey get_key = 1;
     GetKeyResp get_key_resp = 2;
     PutKey put_key = 3;
+    PutKeyResp put_key_resp = 4;
   }
 }

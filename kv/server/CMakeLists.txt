@@ -11,6 +11,9 @@ target_include_directories(server PUBLIC include)
 
 target_link_libraries(server PUBLIC Boost::boost Boost::system KVStore::server-proto KVStore::client-proto KVStore::hint-proto KVStore::Messaging KVStore::Channel stdc++fs.a PkgConfig::Jsoncpp)
 
+add_executable(replica src/server.cpp)
+target_link_libraries(replica PUBLIC server Threads::Threads)
+
 # set_target_properties(server PROPERTIES CXX_CLANG_TIDY clang-tidy)
 
 add_executable(log-test test/log_test.cpp)

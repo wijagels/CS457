@@ -2,9 +2,12 @@ syntax = "proto3";
 
 package kvstore.server;
 
-option cc_enable_arenas = true;
-
 import "google/protobuf/timestamp.proto";
+
+message Introduction {
+  string ip = 1;
+  uint32 port = 2;
+}
 
 message DoWrite {
   string uuid = 1;
@@ -40,11 +43,12 @@ message ReadRepairResponse {
 
 message ServerMessage {
   oneof msg {
-    DoWrite do_write = 1;
-    WriteComplete write_complete = 2;
-    DoRead do_read = 3;
-    ReadComplete read_complete = 4;
-    ReadRepair read_repair = 5;
-    ReadRepairResponse read_repair_response = 6;
+    Introduction intro = 1;
+    DoWrite do_write = 2;
+    WriteComplete write_complete = 3;
+    DoRead do_read = 4;
+    ReadComplete read_complete = 5;
+    ReadRepair read_repair = 6;
+    ReadRepairResponse read_repair_response = 7;
   }
 }
