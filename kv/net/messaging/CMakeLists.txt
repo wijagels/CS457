@@ -1,4 +1,5 @@
-find_package(Protobuf REQUIRED)
+hunter_add_package(Protobuf)
+find_package(Protobuf CONFIG REQUIRED)
 
 add_library(Messaging INTERFACE)
 add_library(KVStore::Messaging ALIAS Messaging)

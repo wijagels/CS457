@@ -52,11 +52,19 @@ class Log : public std::enable_shared_from_this<Log<M>> {
     });
   }
 
+  /**
+   * Replay the log by repeatedly invoking a handler.
+   * Do not use if other threads are writing updates.
+   */
   template <typename Handler>
   void replay_log(Handler &&handler) {
     auto self = shared_from_this();
     m_strand.post([this, self, handler]() {
       auto file = std::ifstream{m_file_path, std::ios::in | std::ios::binary};
+      if (!file.is_open()) {
+        std::cerr << "Nonexistent log\n";
+        return;
+      }
       messaging::Message msg;
       auto read_buf = reinterpret_cast<char *>(msg.header().data());
       std::size_t alloc_size = 32;

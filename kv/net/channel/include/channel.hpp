@@ -1,6 +1,8 @@
 #pragma once
 #include "message.hpp"
 #include <boost/asio.hpp>
+#include <type_traits>
+#include <memory>
 #include <deque>
 #include <google/protobuf/message.h>
 
@@ -16,7 +18,8 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
         m_socket{std::move(socket)},
         m_strand{m_io_service},
         m_msg_handler{std::move(msg_handler)},
-        m_active{false} {}
+        m_active{false},
+        m_reconnect_timer{m_io_service} {}
 
   Channel(boost::asio::io_service &io_service,
           std::function<void(const M &, const std::shared_ptr<Channel<M>> &)> msg_handler)
@@ -24,7 +27,8 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
         m_socket{m_io_service},
         m_strand{m_io_service},
         m_msg_handler{std::move(msg_handler)},
-        m_active{true} {}
+        m_active{true},
+        m_reconnect_timer{m_io_service} {}
 
   ~Channel() = default;
 
@@ -84,19 +88,22 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
 
   auto &handler() noexcept { return m_msg_handler; }
 
+  auto &reconnect_handler() noexcept { return m_reconnect_handler; }
+
  protected:
   void reconnect() {
     if (!m_active) return;
     auto self = shared_from_this();
-    boost::asio::deadline_timer timer(m_io_service);
-    timer.expires_from_now(boost::posix_time::seconds(5));
+    m_reconnect_timer.expires_from_now(boost::posix_time::seconds(5));
     auto handler = m_strand.wrap([this, self](boost::system::error_code ec) {
       if (!ec) {
         m_mq.clear();
-        connect(m_peer);
+        connect_cb(m_peer, [this, self]() { m_reconnect_handler(self); });
+      } else {
+        std::cerr << ec.message() << '\n';
       }
     });
-    timer.async_wait(handler);
+    m_reconnect_timer.async_wait(handler);
   }
 
   void do_send() {
@@ -159,7 +166,10 @@ class Channel : public std::enable_shared_from_this<Channel<M>> {
   messaging::Message m_msg;
   boost::asio::strand m_strand;
   std::function<void(const M &, const std::shared_ptr<Channel<M>> &)> m_msg_handler;
+  std::function<void(const std::shared_ptr<Channel<M>> &)> m_reconnect_handler =
+      [](const std::shared_ptr<Channel<M>> &) {};
   bool m_active;
   boost::asio::ip::tcp::resolver::iterator m_peer;
+  boost::asio::deadline_timer m_reconnect_timer;
 };
 }  // namespace kvstore

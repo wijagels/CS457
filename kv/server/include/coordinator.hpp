@@ -50,6 +50,8 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
  protected:
   void do_accept();
 
+  void do_client_accept();
+
   void handle_read_repair_response(const ReadRepairResponse &msg,
                                    const std::shared_ptr<Channel<ServerMessage>> &from);
 
@@ -79,6 +81,9 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
   void server_msg_handler(const ServerMessage &msg,
                           const std::shared_ptr<Channel<ServerMessage>> &ptr, uint32_t id);
 
+  void client_handler(const client::ClientMessage &msg,
+                      const std::shared_ptr<Channel<client::ClientMessage>> &ptr);
+
   void initialize_outgoing();
 
  private:
@@ -86,7 +91,7 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
   Config m_config;
   std::shared_ptr<Replica> m_replica;
   std::vector<std::shared_ptr<Channel<ServerMessage>>> m_channels;
-  Log<HintMessage> m_hint_log{m_config.hint_log(), m_io_service};
+  std::shared_ptr<Log<HintMessage>> m_hint_log;
 
   std::unordered_map<std::string, pending_read> m_pending_reads;
   boost::asio::strand m_pending_read_strand{m_io_service};
@@ -94,11 +99,14 @@ class Coordinator : public std::enable_shared_from_this<Coordinator> {
   std::unordered_map<std::string, pending_write> m_pending_writes;
   boost::asio::strand m_pending_write_strand{m_io_service};
 
-  std::vector<std::array<std::atomic_int_fast32_t, 256>> m_hints;
+  std::vector<std::array<std::atomic_int_fast32_t, 256>> m_hints{3};
 
   boost::uuids::random_generator m_uuid_gen{};
 
   boost::asio::ip::tcp::acceptor m_acceptor{m_io_service};
   boost::asio::ip::tcp::socket m_socket{m_io_service};
+
+  boost::asio::ip::tcp::acceptor m_client_acceptor{m_io_service};
+  boost::asio::ip::tcp::socket m_client_socket{m_io_service};
 };
 }  // namespace kvstore::server

@@ -1,6 +1,6 @@
 #include "coordinator.cpp"
-#include <iostream>
 #include <boost/asio.hpp>
+#include <iostream>
 
 using namespace kvstore::server;
 
@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   }
   boost::asio::io_service io_service;
   Config cfg{argv[1]};
-  Coordinator c{io_service, cfg};
-  c.start();
+  auto c = std::make_shared<Coordinator>(io_service, cfg);
+  c->start();
   io_service.run();
 }

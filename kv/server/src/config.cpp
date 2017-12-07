@@ -9,6 +9,7 @@ Config::Config(const stdfs::path &config_path) {
   file >> root;
   m_listen_ip = root["listen_ip"].asString();
   m_listen_port = root["listen_port"].asUInt();
+  m_client_port = root["client_port"].asUInt();
   m_log_path = root["logfile"].asString();
   m_hint_log = root["hintlog"].asString();
   for (const auto &replica : root["replicas"]) {
@@ -19,7 +20,9 @@ Config::Config(const stdfs::path &config_path) {
 
 const std::string &Config::listen_ip() const { return m_listen_ip; }
 
-uint32_t Config::listen_port() const { return m_listen_port; }
+uint16_t Config::listen_port() const { return m_listen_port; }
+
+uint16_t Config::client_port() const { return m_client_port; }
 
 const stdfs::path &Config::log_path() const { return m_log_path; }
 

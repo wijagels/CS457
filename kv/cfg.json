@@ -1,0 +1,11 @@
+{
+  "listen_ip": "127.0.0.1",
+  "listen_port": 9000,
+  "logfile": "test.log",
+  "hintlog": "hints.log",
+  "replicas": [
+    {"host": "127.0.0.1", "port": 9001},
+    {"host": "example.com", "port": "9001"}
+  ]
+}
+

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package kvstore.server;
 
-import "google/protobuf/timestamp.proto";
-
 message AddHint {
   uint32 replica = 1;
   uint32 key = 2;

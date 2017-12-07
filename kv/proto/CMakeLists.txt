@@ -1,80 +1,40 @@
-find_package(Protobuf REQUIRED)
+hunter_add_package(Protobuf)
+find_package(Protobuf CONFIG REQUIRED)
 
-protobuf_generate_cpp(CLIENT_PROTO_SRCS CLIENT_PROTO_HDRS client.proto)
-add_library(client-proto ${CLIENT_PROTO_SRCS} ${CLIENT_PROTO_HDRS})
+set(MESSAGES_PROTOS server.proto client.proto hint.proto)
+set(MESSAGES_SRCS)
+set(MESSAGES_HDRS)
+
+foreach(proto_file ${MESSAGES_PROTOS})
+  get_filename_component(proto_file_abs ${proto_file} ABSOLUTE)
+  get_filename_component(basename ${proto_file} NAME_WE)
+  set(generated_files ${basename}.pb.cc ${basename}.pb.h)
+
+  list(APPEND MESSAGES_SRCS ${basename}.pb.cc)
+  list(APPEND MESSAGES_HDRS ${CMAKE_CURRENT_BINARY_DIR}/${basename}.pb.h)
+
+  add_custom_command(
+      OUTPUT ${generated_files}
+      COMMAND protobuf::protoc --cpp_out ${CMAKE_CURRENT_BINARY_DIR} -I ${CMAKE_CURRENT_SOURCE_DIR} ${proto_file_abs}
+      COMMENT "Generating ${generated_files} from ${proto_file}"
+      VERBATIM
+  )
+endforeach()
+
+add_library(client-proto client.pb.cc client.pb.h)
 target_compile_definitions(client-proto PUBLIC PROTOBUF_INLINE_NOT_IN_HEADERS=0)
-target_link_libraries(client-proto INTERFACE protobuf::libprotobuf)
-target_include_directories(client-proto SYSTEM INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-    $<INSTALL_INTERFACE:include>
-    )
+target_link_libraries(client-proto PUBLIC protobuf::libprotobuf)
+target_include_directories(client-proto SYSTEM INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 add_library(KVStore::client-proto ALIAS client-proto)
 
-protobuf_generate_cpp(SERVER_PROTO_SRCS SERVER_PROTO_HDRS server.proto)
-add_library(server-proto ${SERVER_PROTO_SRCS} ${SERVER_PROTO_HDRS})
+add_library(server-proto server.pb.cc server.pb.h)
 target_compile_definitions(server-proto PUBLIC PROTOBUF_INLINE_NOT_IN_HEADERS=0)
-target_link_libraries(server-proto INTERFACE protobuf::libprotobuf)
-target_include_directories(server-proto SYSTEM INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-    $<INSTALL_INTERFACE:include>
-    )
+target_link_libraries(server-proto PUBLIC protobuf::libprotobuf)
+target_include_directories(server-proto SYSTEM INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 add_library(KVStore::server-proto ALIAS server-proto)
 
-protobuf_generate_cpp(HINT_PROTO_SRCS HINT_PROTO_HDRS hint.proto)
-add_library(hint-proto ${HINT_PROTO_SRCS} ${HINT_PROTO_HDRS})
+add_library(hint-proto hint.pb.cc hint.pb.h)
 target_compile_definitions(hint-proto PUBLIC PROTOBUF_INLINE_NOT_IN_HEADERS=0)
-target_link_libraries(hint-proto INTERFACE protobuf::libprotobuf)
-target_include_directories(hint-proto SYSTEM INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-    $<INSTALL_INTERFACE:include>
-    )
+target_link_libraries(hint-proto PUBLIC protobuf::libprotobuf)
+target_include_directories(hint-proto SYSTEM INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 add_library(KVStore::hint-proto ALIAS hint-proto)
-
-# Who the hell knows if this even works
-install(TARGETS client-proto EXPORT client-proto-targets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
-    )
-INSTALL(FILES
-    ${CLIENT_PROTO_HDRS}
-    DESTINATION include
-    )
-install(EXPORT client-proto-targets
-    FILE client-proto-targets.cmake
-    NAMESPACE KVStore::
-    DESTINATION lib/cmake/KVStore-client-proto
-    )
-
-install(TARGETS server-proto EXPORT server-proto-targets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
-    )
-INSTALL(FILES
-    ${SERVER_PROTO_HDRS}
-    DESTINATION include
-    )
-install(EXPORT server-proto-targets
-    FILE server-proto-targets.cmake
-    NAMESPACE KVStore::
-    DESTINATION lib/cmake/KVStore-server-proto
-    )
-
-install(TARGETS hint-proto EXPORT hint-proto-targets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
-    )
-INSTALL(FILES
-    ${HINT_PROTO_HDRS}
-    DESTINATION include
-    )
-install(EXPORT hint-proto-targets
-    FILE hint-proto-targets.cmake
-    NAMESPACE KVStore::
-    DESTINATION lib/cmake/KVStore-hint-proto
-    )
