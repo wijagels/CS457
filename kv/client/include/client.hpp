@@ -20,5 +20,6 @@ class Client : public std::enable_shared_from_this<Client> {
 
   boost::asio::io_service &m_io_service;
   std::shared_ptr<Channel<ClientMessage>> m_channel;
+  boost::asio::deadline_timer m_timer;
 };
 }  // namespace kvstore::client

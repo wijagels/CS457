@@ -10,7 +10,8 @@ Client::Client(boost::asio::io_service &io_service)
     : m_io_service{io_service},
       m_channel{std::make_shared<Channel<ClientMessage>>(
           m_io_service,
-          [](const ClientMessage &, const std::shared_ptr<Channel<ClientMessage>> &) {})} {}
+          [](const ClientMessage &, const std::shared_ptr<Channel<ClientMessage>> &) {})},
+      m_timer{m_io_service} {}
 
 void Client::connect(const std::string &host, const std::string &port) {
   using boost::asio::ip::tcp;
@@ -42,6 +43,7 @@ void Client::message_handler(const ClientMessage &msg) {
 }
 
 void Client::run_cmd() {
+  m_timer.cancel();
   std::string command;
   std::cout << "Command> ";
   std::getline(std::cin, command);
@@ -49,12 +51,20 @@ void Client::run_cmd() {
   const std::regex get_re{R"(^get (\d) (\d+)$)", std::regex::icase};
   const std::regex put_re{R"(^put (\d) (\d+) (.+)$)", std::regex::icase};
   std::smatch match;
+  auto self = shared_from_this();
   if (std::regex_match(command, match, get_re)) {
     ClientMessage cm;
     cm.mutable_get_key()->set_consistency(std::stoi(match[1].str()));
     cm.mutable_get_key()->set_key(std::stoi(match[2].str()));
     cm.mutable_get_key()->set_stream(0);
     m_channel->send_msg(cm);
+    m_timer.expires_from_now(boost::posix_time::seconds(5));
+    m_timer.async_wait([this, self](boost::system::error_code ec) {
+      if (!ec) {
+        std::cout << "Last command failed\n";
+        run_cmd();
+      }
+    });
   } else if (std::regex_match(command, match, put_re)) {
     ClientMessage cm;
     cm.mutable_put_key()->set_consistency(std::stoi(match[1].str()));
@@ -62,6 +72,13 @@ void Client::run_cmd() {
     cm.mutable_put_key()->set_val(match[3].str());
     cm.mutable_put_key()->set_stream(0);
     m_channel->send_msg(cm);
+    m_timer.expires_from_now(boost::posix_time::seconds(5));
+    m_timer.async_wait([this, self](boost::system::error_code ec) {
+      if (!ec) {
+        std::cout << "Last command failed\n";
+        run_cmd();
+      }
+    });
   } else {
     std::cout << "Invalid command\n";
     run_cmd();
